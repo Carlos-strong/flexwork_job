@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Nouvelles couleurs UI/UX FlexWork (Variables adaptées au nouveau modèle) */
+    --background: 48 20% 95%; /* #F4F3EF */
+    --foreground: 45 8% 9%; /* #1A1916 */
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 45 8% 9%; 
+    --popover: 0 0% 100%;
+    --popover-foreground: 45 8% 9%;
+    --primary: 225 76% 53%; /* #2D5BE3 */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF */
+    --secondary: 60 20% 98%; /* #FAFAF8 */
+    --secondary-foreground: 42 6% 33%; /* #5A5750 */
+    --muted: 60 20% 98%; /* #FAFAF8 */
+    --muted-foreground: 42 6% 33%; /* #5A5750 */
+    --accent: 60 20% 98%; /* #FAFAF8 */
+    --accent-foreground: 45 8% 9%;
+    --destructive: 6 64% 46%; /* #C0392B */
+    --destructive-foreground: 0 0% 100%;
+    --border: 47 14% 87%; /* #E2E0D9 */
+    --input: 47 14% 87%;
+    --ring: 225 76% 53%;
+    --radius: 0.625rem; /* 10px radius par défaut */
+  }
+
+  .dark {
+    /* Le thème sombre est partiellement désactivé ou adapté si nécessaire */
+    --background: 45 8% 9%;
+    --foreground: 48 20% 95%;
+    --card: 45 8% 9%;
+    --card-foreground: 48 20% 95%;
+    --popover: 45 8% 9%;
+    --popover-foreground: 48 20% 95%;
+    --primary: 225 76% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 42 6% 15%;
+    --secondary-foreground: 48 20% 95%;
+    --muted: 42 6% 15%;
+    --muted-foreground: 47 14% 67%;
+    --accent: 42 6% 15%;
+    --accent-foreground: 48 20% 95%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 42 6% 20%;
+    --input: 42 6% 20%;
+    --ring: 225 76% 63%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Animation flottante pour les illustrations */
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  @keyframes float-delayed {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float-delayed 3s ease-in-out infinite;
+    animation-delay: 1.5s;
+  }
+
+  .animate-float-slower {
+    animation: float 4s ease-in-out infinite;
+    animation-delay: 0.75s;
+  }
+}

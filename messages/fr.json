@@ -1,0 +1,97 @@
+{
+  "common": {
+    "appName": "Flexwork",
+    "tagline": "La plateforme qui connecte freelances et clients",
+    "loading": "Chargement...",
+    "error": "Une erreur est survenue",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "search": "Rechercher",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Valider"
+  },
+  "nav": {
+    "home": "Accueil",
+    "howItWorks": "Comment ça marche",
+    "pricing": "Tarifs",
+    "about": "À propos",
+    "contact": "Contact",
+    "faq": "FAQ",
+    "freelancers": "Freelancers",
+    "missions": "Missions",
+    "login": "Connexion",
+    "register": "Inscription",
+    "dashboard": "Mon espace",
+    "admin": "Administration"
+  },
+  "home": {
+    "heroTitle": "Trouvez le freelance parfait pour votre projet",
+    "heroSubtitle": "Flexwork connecte les meilleurs talents avec les entreprises qui ont besoin d'eux. Publication de mission, paiement sécurisé, et matching IA.",
+    "heroCta": "Commencer",
+    "heroCtaSecondary": "Voir les missions",
+    "forClients": "Pour les clients",
+    "forFreelancers": "Pour les freelances",
+    "statsMissions": "missions publiées",
+    "statsFreelancers": "freelances inscrits",
+    "statsSatisfaction": "de satisfaction"
+  },
+  "auth": {
+    "loginTitle": "Connexion",
+    "registerTitle": "Inscription",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "role": "Je suis",
+    "client": "Client",
+    "freelancer": "Freelance",
+    "loginButton": "Se connecter",
+    "registerButton": "Créer mon compte",
+    "orContinueWith": "Ou continuer avec",
+    "alreadyHaveAccount": "Déjà un compte ?",
+    "noAccountYet": "Pas encore de compte ?"
+  },
+  "missions": {
+    "title": "Missions disponibles",
+    "create": "Publier une mission",
+    "budget": "Budget",
+    "skills": "Compétences requises",
+    "duration": "Durée",
+    "status": "Statut",
+    "applications": "Candidatures",
+    "noMissions": "Aucune mission pour le moment"
+  },
+  "freelancers": {
+    "title": "Nos freelances",
+    "hourlyRate": "Taux journalier",
+    "availability": "Disponibilité",
+    "fullTime": "Temps plein",
+    "partTime": "Temps partiel",
+    "rating": "Note",
+    "viewProfile": "Voir le profil",
+    "invite": "Inviter à une mission"
+  },
+  "dashboard": {
+    "overview": "Vue d'ensemble",
+    "missions": "Mes missions",
+    "profile": "Mon profil",
+    "payments": "Paiements",
+    "search": "Rechercher",
+    "messages": "Messages",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "activeMissions": "Missions en cours",
+    "totalEarned": "Total gagné",
+    "totalSpent": "Total dépensé"
+  },
+  "errors": {
+    "notFound": "Page non trouvée",
+    "notFoundDesc": "La page que vous cherchez n'existe pas.",
+    "unauthorized": "Accès non autorisé",
+    "serverError": "Erreur serveur"
+  }
+}

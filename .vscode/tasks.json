@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Prisma Validate",
+			"type": "shell",
+			"command": "npx prisma validate"
+		},
+		{
+			"label": "Prisma Validate",
+			"type": "shell",
+			"command": "npx prisma validate"
+		}
+	]
+}

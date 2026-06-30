@@ -1,0 +1,46 @@
+version: "3.8"
+
+services:
+  # === PostgreSQL (optionnel si Laragon ne l'a pas) ===
+  postgres:
+    image: postgres:16
+    container_name: flexwork-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: flexwork
+    ports:
+      - "5433:5432"  # Port 5433 pour éviter conflit avec Laragon PostgreSQL
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    profiles:
+      - full     # docker compose --profile full up
+      - database # docker compose --profile database up
+
+  # === Cache / Queue (BullMQ) ===
+  redis:
+    image: redis:7-alpine
+    container_name: flexwork-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # === Mailpit — Capture et inspection des emails ===
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: flexwork-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
+volumes:
+  postgres_data:
+  redis_data:

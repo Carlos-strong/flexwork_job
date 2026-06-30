@@ -1,0 +1,796 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== ENUMS ==========
+
+enum ProfileType {
+  FREELANCER
+  CLIENT
+  ADMIN
+}
+
+/// Statut de validation administrative d'un prestataire ou d'une vérification d'identité
+enum ValidationStatus {
+  EN_ATTENTE
+  VALIDE
+  REJETE
+}
+
+/// Mode de tarification d'un prestataire pour un métier donné
+enum TarificationMode {
+  HORAIRE
+  JOURNALIER
+  HEBDOMADAIRE
+  MENSUEL
+  PAR_PRESTATION
+}
+
+/// Statut d'une demande de service
+enum DemandeStatus {
+  EN_ATTENTE
+  EN_COURS
+  COMPLETEE
+  ANNULEE
+}
+
+/// Type de pièce d'identité
+enum PieceType {
+  CARTE_NATIONALE
+  PASSEPORT
+  PERMIS
+}
+
+/// Jours de la semaine pour la disponibilité
+enum JourSemaine {
+  LUNDI
+  MARDI
+  MERCREDI
+  JEUDI
+  VENDREDI
+  SAMEDI
+  DIMANCHE
+}
+
+/// Niveaux d'expérience
+enum ExperienceLevel {
+  DEBUTANT
+  UN_A_TROIS_ANS
+  TROIS_A_CINQ_ANS
+  PLUS_DE_CINQ_ANS
+}
+
+enum MissionStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ApplicationStatus {
+  UNREAD            // Nouvelle candidature — en attente de lecture par le client
+  READ              // Lue par le client
+  PENDING           // @deprecated — remplacé par UNREAD (rétrocompatibilité)
+  IDENTITY_PENDING  // Candidature reçue — KYC freelance en attente de validation admin
+  SHORTLISTED       // Présélectionnée par le client
+  DISCUSSION        // En discussion avec le freelance
+  INTERVIEW         // Entretien programmé
+  OFFER_SENT        // Offre envoyée au freelance
+  OFFER_ACCEPTED    // Offre acceptée par le freelance → contrat à créer
+  OFFER_DECLINED    // Offre refusée par le freelance → retour shortlist
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  ARCHIVED          // Archivée par le client
+}
+
+/// Mode d'exécution d'une mission
+enum WorkMode {
+  REMOTE    // 100% À distance
+  ON_SITE   // 100% Sur site (présentiel)
+  HYBRID    // Hybride (mix présentiel + remote)
+}
+
+/// Type de budget d'une mission
+enum BudgetType {
+  FIXED       // Montant fixé par le client
+  OPEN_QUOTE  // Ouvert aux devis des prestataires
+}
+
+enum ContractStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  DISPUTED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  RELEASED
+}
+
+enum PaymentType {
+  DEPOSIT
+  RELEASE
+  PAYOUT
+  REFUND
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+// ========== MODELS ==========
+
+/// Compte unique — un utilisateur possède un seul compte.
+/// Sous ce compte, il peut avoir un ou plusieurs rôles (CLIENT, PRESTATAIRE, ADMIN).
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  emailVerified   DateTime?
+  passwordHash    String?
+  image           String?   // Photo de profil (alias `photo` dans le métier)
+
+  // Informations partagées (compte)
+  firstName       String?
+  lastName        String?
+  phone           String?   @unique // Téléphone — obligatoire pour les services à domicile
+  phoneVerified   DateTime?         // Date de vérification du téléphone par OTP
+  country         String?
+
+  // Profil actif (dernier utilisé) — permet le basculement sans recréer un compte
+  activeProfile   ProfileType @default(FREELANCER)
+
+  // Stripe Connect (partagé au niveau du compte)
+  stripeAccountId          String?
+  stripeOnboardingComplete Boolean @default(false)
+
+  // TrustEngine
+  trustEngineId   String?
+
+  // Relations existantes
+  accounts           Account[]
+  sessions           Session[]
+  freelancerProfile  FreelancerProfile?
+  clientProfile      ClientProfile?
+  sentMessages       Message[]        @relation("SentMessages")
+  receivedMessages   Message[]        @relation("ReceivedMessages")
+  payments           Payment[]
+
+  // Relations nouvelles — rôles
+  userRoles        UserRole[]
+
+  // Relations nouvelles — vérification d'identité
+  verificationsIdentite VerificationIdentite[]
+
+  // Relations nouvelles — adresses
+  adresses         Adresse[]
+
+  // Relations nouvelles — OTP
+  otpCodes         OtpCode[]
+
+  // Relations nouvelles — métiers exercés (prestataire)
+  prestataireMetiers PrestataireMetier[]
+
+  // Relations nouvelles — demandes de service (en tant que client)
+  demandesClient   Demande[]         @relation("ClientDemandes")
+
+  // Relations nouvelles — cartes virtuelles de test
+  virtualCards     VirtualCard[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([firstName, lastName])
+  @@index([phone])
+  @@map("users")
+}
+
+/// Profil freelance — l'utilisateur peut avoir ce profil pour travailler comme freelance.
+/// @deprecated Utiliser PrestataireMetier + Metier pour les services à domicile.
+model FreelancerProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Informations freelance
+  title           String?
+  bio             String?
+  skills          String[]
+  hourlyRate      Float?
+  availability    String?    // "full-time", "part-time", "weekends"
+  portfolio       String?
+  location        String?
+  experience      String?    // Expérience et formation
+  isValidated     Boolean   @default(false)
+
+  // Relations
+  applications    Application[]
+  contracts       Contract[]      @relation("FreelancerContracts")
+  timeSessions    TimeSession[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([skills])
+  @@map("freelancer_profiles")
+}
+
+/// Table polymorphe centralisée pour tous les fichiers (documents, images, photos)
+/// Permet d'attacher des fichiers à n'importe quelle entité via entityType/entityId
+model File {
+  id          String   @id @default(cuid())
+  userId      String?  // Propriétaire du fichier
+  filename    String   // Nom original du fichier
+  path        String   @unique // Chemin de stockage
+  mimeType    String   // Type MIME (image/jpeg, application/pdf, etc.)
+  size        Int      // Taille en octets
+
+  // Polymorphisme — l'entité propriétaire
+  entityType  String   // "User", "ClientProfile", "VerificationIdentite", "PrestataireMetier", "Demande", "Message"
+  entityId    String   // ID de l'entité liée
+  category    String   // "avatar", "photo_recto", "photo_verso", "selfie", "cahier_des_charges", "certificat", "portfolio", "photo_demande", "piece_jointe"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([entityType, entityId, category])
+  @@index([userId])
+  @@map("files")
+}
+
+/// Profil client — l'utilisateur peut avoir ce profil pour recruter et publier des missions.
+/// @deprecated Utiliser User + UserRole(CLIENT) + Demande pour les services à domicile.
+model ClientProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Informations client
+  companyName     String?
+  companySector   String?
+  description     String?    // Description de l'activité ou des besoins
+
+  // === Étape 3 — Métier ===
+  domaineInterventionId   String?   // ID catégorie/métier choisi
+  domaineInterventionPerso String?  // Texte libre si "Autre"
+  servicesIds              String[] // Types d'interventions sélectionnés
+  servicePerso             String?  // Texte libre si "Autre" pour service
+  competencesRequisesIds   String[] // Compétences requises (liste des services)
+  experienceRequise        String?  // DEBUTANT / UN_A_TROIS_ANS / TROIS_A_CINQ_ANS / PLUS_DE_CINQ_ANS
+  competencesLibres        String[] // Compétences libres (TagInput)
+
+  // === Étape 3 — Zone ===
+  paysIntervention   String?
+  departement        String?
+  villeIntervention  String?
+
+  // === Étape 3 — Budget ===
+  modeTarification   String?  // HORAIRE / JOURNALIER / HEBDOMADAIRE / MENSUEL / PAR_PRESTATION
+  tauxMax            Float?   // Budget max
+
+  // === KYC Entreprise (Porte de paiement/contrat — PRD règle #5) ===
+  siret                     String?
+  kbisUrl                   String?           // URL du fichier KBIS uploadé
+  ribUrl                    String?           // URL du RIB entreprise uploadé
+  companyVerificationStatus ValidationStatus  @default(EN_ATTENTE)
+  companyVerifiedAt         DateTime?
+  companyVerifiedById       String?           // ID de l'admin qui a validé
+
+  // Relations
+  ownedMissions   Mission[]   @relation("ClientMissions")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([domaineInterventionId])
+  @@index([paysIntervention])
+  @@map("client_profiles")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ========== NOUVEAUX MODÈLES — SERVICES À DOMICILE ==========
+
+/// Rôle utilisateur (CLIENT, PRESTATAIRE, ADMIN)
+model Role {
+  id        String     @id @default(cuid())
+  libelle   String     @unique // "CLIENT", "PRESTATAIRE", "ADMIN"
+  users     UserRole[]
+
+  @@map("roles")
+}
+
+/// Table de jonction — un utilisateur peut avoir plusieurs rôles (CLIENT + PRESTATAIRE)
+model UserRole {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId       String
+  role         Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+/// Vérification d'identité d'un prestataire (pièce d'identité + selfie)
+/// Faite UNE SEULE FOIS par utilisateur, quel que soit le nombre de métiers exercés.
+model VerificationIdentite {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pieceType       PieceType        // CARTE_NATIONALE, PASSEPORT, PERMIS
+  numeroPiece     String
+  photoRecto      String           // URL de la photo recto
+  photoVerso      String?          // URL de la photo verso (optionnel selon type)
+  selfieUrl       String?          // Selfie de vérification
+  statut          ValidationStatus @default(EN_ATTENTE)
+  dateSoumission  DateTime         @default(now())
+  dateTraitement  DateTime?
+  traiteParId     String?          // ID de l'admin qui a traité
+  motifRejet      String?          // Motif si rejeté
+
+  @@index([userId])
+  @@index([statut])
+  @@map("verifications_identite")
+}
+
+/// Catégorie de service (ex: Plomberie, Électricité, Ménage, Livraison, Jardinage, Peinture, Maçonnerie)
+model Categorie {
+  id          String    @id @default(cuid())
+  libelle     String    @unique
+  description String?
+  icon        String?   // Icône ou emoji
+  ordre       Int       @default(0) // Ordre d'affichage
+  metiers     Metier[]
+  demandes    Demande[]
+
+  @@map("categories")
+}
+
+/// Métier — lié à une catégorie (ex: Plombier → Plomberie)
+model Metier {
+  id            String    @id @default(cuid())
+  categorieId   String
+  categorie     Categorie @relation(fields: [categorieId], references: [id])
+  libelle       String    // "Plombier", "Électricien", "Maçon", etc.
+  description   String?
+  services      Service[]
+  prestataireMetiers PrestataireMetier[]
+
+  @@unique([categorieId, libelle])
+  @@index([categorieId])
+  @@map("metiers")
+}
+
+/// Service spécifique proposé dans un métier (ex: "Réparation de fuite" pour Plomberie)
+model Service {
+  id          String    @id @default(cuid())
+  metierId    String
+  metier      Metier    @relation(fields: [metierId], references: [id])
+  libelle     String    // "Réparation de fuite", "Installation robinet", etc.
+  description String?
+  dureeEstimee Int?     // Durée estimée en minutes
+
+  prestataireServices PrestataireService[]
+  demandes            Demande[]
+
+  @@unique([metierId, libelle])
+  @@index([metierId])
+  @@map("services")
+}
+
+/// Un prestataire exerçant un métier spécifique
+/// C'est la table pivot clé : un utilisateur peut avoir plusieurs métiers,
+/// chacun avec son expérience, sa description, son mode de tarification,
+/// et son propre statut de validation administrative.
+model PrestataireMetier {
+  id              String           @id @default(cuid())
+  userId          String
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metierId        String
+  metier          Metier           @relation(fields: [metierId], references: [id])
+  experience      ExperienceLevel?
+  description     String?          @db.Text // Description personnalisée pour ce métier
+  modeTarification TarificationMode @default(PAR_PRESTATION)
+  taux            Float?           // Tarif (horaire, journalier, hebdo, mensuel) en FCFA — null si PAR_PRESTATION
+  statutValidation ValidationStatus @default(EN_ATTENTE)
+  dateValidation  DateTime?
+  valideParId     String?          // Admin qui a validé
+  motifRejet      String?          // Motif si rejeté
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  servicesProposes PrestataireService[]
+  zones            ZoneIntervention[]
+  disponibilites   Disponibilite[]
+  demandes         Demande[]
+
+  @@unique([userId, metierId])
+  @@index([metierId, statutValidation])
+  @@map("prestataire_metiers")
+}
+
+/// Prix fixé par un prestataire pour un service spécifique
+model PrestataireService {
+  id                  String   @id @default(cuid())
+  prestataireMetierId String
+  prestataireMetier   PrestataireMetier @relation(fields: [prestataireMetierId], references: [id], onDelete: Cascade)
+  serviceId           String
+  service             Service  @relation(fields: [serviceId], references: [id])
+  prix                Float?   // Prix en FCFA (null si tarification globale HORAIRE/JOURNALIER)
+  description         String?  // Description personnalisée du service
+
+  @@unique([prestataireMetierId, serviceId])
+  @@index([serviceId])
+  @@map("prestataire_services")
+}
+
+/// Zone d'intervention — rattachée à un métier spécifique du prestataire
+model ZoneIntervention {
+  id                  String   @id @default(cuid())
+  prestataireMetierId String
+  prestataireMetier   PrestataireMetier @relation(fields: [prestataireMetierId], references: [id], onDelete: Cascade)
+  ville               String
+  arrondissement      String?  // Arrondissement/Commune
+  quartier            String?  // Quartier spécifique
+  rayonKm             Int      @default(10) // Rayon d'intervention en km
+
+  @@index([ville, quartier])
+  @@index([prestataireMetierId])
+  @@map("zones_intervention")
+}
+
+/// Disponibilité — rattachée à un métier spécifique du prestataire
+model Disponibilite {
+  id                  String      @id @default(cuid())
+  prestataireMetierId String
+  prestataireMetier   PrestataireMetier @relation(fields: [prestataireMetierId], references: [id], onDelete: Cascade)
+  jourSemaine         JourSemaine
+  heureDebut          String      // Format "HH:mm"
+  heureFin            String      // Format "HH:mm"
+  estDisponible       Boolean     @default(true)
+
+  @@unique([prestataireMetierId, jourSemaine])
+  @@index([prestataireMetierId, jourSemaine])
+  @@map("disponibilites")
+}
+
+/// Adresse d'un utilisateur (domicile, intervention, etc.)
+model Adresse {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intitule        String?  // "Domicile", "Bureau", etc.
+  pays            String   @default("Cameroun")
+  ville           String
+  arrondissement  String?
+  quartier        String?
+  adresseDetaillee String?
+  latitude        Float?
+  longitude       Float?
+  estPrincipale   Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  demandes     Demande[]    @relation("AdresseDemande")
+
+  @@index([userId])
+  @@index([ville, quartier])
+  @@map("adresses")
+}
+
+/// Demande de service créée par un client
+model Demande {
+  id              String         @id @default(cuid())
+  clientId        String
+  client          User           @relation("ClientDemandes", fields: [clientId], references: [id], onDelete: Cascade)
+  categorieId     String?
+  categorie       Categorie?     @relation(fields: [categorieId], references: [id])
+  serviceId       String?
+  service         Service?       @relation(fields: [serviceId], references: [id])
+  description     String         @db.Text
+  photos          String[]       // URLs des photos
+  adresseId       String?
+  adresse         Adresse?       @relation("AdresseDemande", fields: [adresseId], references: [id])
+  dateSouhaitee   DateTime?
+  heureSouhaitee  String?        // Format "HH:mm"
+  budgetPropose   Float?
+  statut          DemandeStatus  @default(EN_ATTENTE)
+  prestataireMetierId String?    // Assigné à un prestataire spécifique
+  prestataireMetier   PrestataireMetier? @relation(fields: [prestataireMetierId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([serviceId, statut])
+  @@index([clientId, createdAt])
+  @@index([prestataireMetierId])
+  @@map("demandes")
+}
+
+/// Code OTP pour la vérification téléphonique
+model OtpCode {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code        String
+  phone       String   // Numéro de téléphone vérifié
+  type        String   // "VERIFICATION_PHONE", "RESET_PASSWORD"
+  estUtilise  Boolean  @default(false)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([userId, type])
+  @@index([phone, code])
+  @@map("otp_codes")
+}
+
+// ========== MODÈLES EXISTANTS — MISSIONS / CONTRATS ==========
+
+model Mission {
+  id            String        @id @default(cuid())
+  clientId      String
+  client        ClientProfile @relation("ClientMissions", fields: [clientId], references: [id])
+  title         String
+  description   String        @db.Text
+  budget        Float?
+  budgetType    BudgetType    @default(FIXED)
+  currency      String        @default("XAF")
+  skills        String[]
+  duration      String?
+  status        MissionStatus @default(OPEN)
+  // Lieu d'exécution en deux niveaux (PRD règle #2)
+  workMode         WorkMode  @default(REMOTE)
+  hybridDaysPerWeek Int?     // Nb jours/sem sur site (si HYBRID)
+  missionCity      String?   // Ville (si ON_SITE ou HYBRID)
+  missionCountry   String?   // Pays (si ON_SITE ou HYBRID)
+  location         String?   // Champ legacy — conservé pour rétrocompatibilité
+  // Disponibilité souhaitée (PRD Étape 3)
+  missionStartDate DateTime? // Date de démarrage souhaitée
+  missionEndDate   DateTime? // Date de fin souhaitée
+  missionDays      String?   // Jours souhaités (ex: "LUNDI,MARDI,MERCREDI" ou "SUR_RDV")
+  missionStartHour String?   // Heure début souhaitée (format "HH:mm")
+  missionEndHour   String?   // Heure fin souhaitée (format "HH:mm")
+  expiresAt        DateTime? // Date d'expiration de la mission
+  // Taxonomie besoin (PRD Étape 1)
+  categorieId      String?   // ID domaine/catégorie
+  categorieAutre   String?   // Texte libre si "Autre"
+  metierId         String?   // ID métier sélectionné
+  metierAutre      String?   // Texte libre si "Autre"
+  serviceAutre     String?   // Texte libre pour type intervention
+  experienceRequise String?  // DEBUTANT / UN_A_TROIS_ANS / TROIS_A_CINQ_ANS / PLUS_DE_CINQ_ANS
+
+  applications  Application[]
+  contract      Contract?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Index pour recherche full-text (PostgreSQL)
+  @@index([title, status, skills])
+  @@map("missions")
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  freelancerId    String
+  freelancer      FreelancerProfile @relation(fields: [freelancerId], references: [id])
+  missionId       String
+  mission         Mission           @relation(fields: [missionId], references: [id])
+  coverLetter     String?           @db.Text
+  proposedBudget  Float?
+  status          ApplicationStatus @default(PENDING)
+  message         String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([freelancerId, missionId])
+  @@map("applications")
+}
+
+model Contract {
+  id            String         @id @default(cuid())
+  missionId     String         @unique
+  mission       Mission        @relation(fields: [missionId], references: [id])
+  freelancerId  String
+  freelancer    FreelancerProfile @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  status        ContractStatus @default(PENDING)
+
+  // Escrow TrustEngine
+  escrowAmount  Float?
+  escrowId      String?
+
+  milestones    Milestone[]
+  messages      Message[]
+  timeSessions  TimeSession[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("contracts")
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  contractId  String
+  contract    Contract        @relation(fields: [contractId], references: [id])
+  title       String
+  description String?         @db.Text
+  amount      Float
+  status      MilestoneStatus @default(PENDING)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+
+  @@map("milestones")
+}
+
+model TimeSession {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  freelancerId String
+  freelancer  FreelancerProfile @relation(fields: [freelancerId], references: [id])
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int?     // en secondes
+  createdAt   DateTime @default(now())
+
+  @@map("time_sessions")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  senderId    String
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  content     String   @db.Text
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@map("messages")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  amount          Float
+  currency        String        @default("EUR")
+  stripePaymentId String?
+  trustEngineId   String?
+  virtualCardId   String?       // ID de la carte virtuelle utilisée (en mode test)
+  virtualCard     VirtualCard?  @relation(fields: [virtualCardId], references: [id])
+  type            PaymentType
+  status          PaymentStatus @default(PENDING)
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  @@map("payments")
+}
+
+// ═══════════════════════════════════════════════
+// VIRTUAL VISA CARD — Paiements de test / dev
+// ═══════════════════════════════════════════════
+
+/// Carte Visa virtuelle pour les tests de paiement (KYC Différé)
+/// Permet de simuler des transactions sans avoir recours à Stripe en dev.
+/// Chaque carte est préchargée avec un solde fictif et liée à un utilisateur.
+model VirtualCard {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Données de la carte (générées, valeurs de test)
+  cardNumber      String   @unique   // Numéro de carte (masqué en frontend)
+  cardholderName  String             // Nom du porteur
+  expiryMonth     Int                // Mois d'expiration
+  expiryYear      Int                // Année d'expiration
+  cvv             String             // Cryptogramme visuel
+  brand           String   @default("Visa") // "Visa", "Mastercard"
+
+  // Solde & limites
+  balance         Float    @default(10000)  // Solde disponible (en EUR)
+  initialBalance  Float    @default(10000)  // Solde initial (pour référence)
+  currency        String   @default("EUR")
+  isActive        Boolean  @default(true)   // Désactivable après test
+
+  // Métadonnées
+  label           String?  // Libellé perso (ex: "Carte test UMA", "Carte dév")
+  isTestCard      Boolean  @default(true)   // True = carte de test uniquement
+  usedInProduction Boolean @default(false)  // Passer à true si utilisée hors dev
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  transactions    VirtualCardTransaction[]
+  payments        Payment[]
+
+  @@index([userId])
+  @@index([isTestCard])
+  @@map("virtual_cards")
+}
+
+/// Transaction liée à une carte virtuelle
+model VirtualCardTransaction {
+  id              String        @id @default(cuid())
+  virtualCardId   String
+  virtualCard     VirtualCard   @relation(fields: [virtualCardId], references: [id], onDelete: Cascade)
+
+  type            PaymentType   // DEPOSIT (crédit), RELEASE, PAYOUT, REFUND
+  amount          Float
+  currency        String        @default("EUR")
+  status          PaymentStatus @default(PENDING)
+
+  // Liens métier
+  contractId      String?
+  missionTitle    String?
+  description     String?       // Libellé de la transaction
+
+  // Solde après transaction (pour historique)
+  balanceBefore   Float
+  balanceAfter    Float
+
+  // Référence externe (si débouche sur un vrai paiement Stripe en prod)
+  stripePaymentId String?
+
+  createdAt       DateTime      @default(now())
+
+  @@index([virtualCardId, createdAt])
+  @@index([contractId])
+  @@map("virtual_card_transactions")
+}
