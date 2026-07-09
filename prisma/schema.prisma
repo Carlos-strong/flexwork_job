@@ -898,6 +898,10 @@ model Contract {
   freelancerSignedAt DateTime?                 // Date de signature par le freelance
   fullySignedAt  DateTime?                     // Date des deux signatures (contrat juridiquement valide)
 
+  // Document généré
+  documentUrl       String?                   // URL ou chemin du document PDF/HTML généré
+  documentGeneratedAt DateTime?               // Date de génération du document
+
   milestones    Milestone[]
   messages      Message[]
   timeSessions  TimeSession[]
