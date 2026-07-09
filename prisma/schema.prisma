@@ -241,6 +241,38 @@ model ContractSignature {
   @@map("contract_signatures")
 }
 
+/// Journal d'audit immuable des contrats — chaque entrée est horodatée,
+/// signée (hash chaîné) et ne peut pas être modifiée ou supprimée.
+/// Permet de tracer : création, signature client, signature prestataire,
+/// verrouillage, tentative de modification, validation d'intégrité.
+model ContractAuditEntry {
+  id            String   @id @default(cuid())
+  contractId    String
+  contract      Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  // Type d'événement
+  event         String   // "CONTRACT_CREATED" | "DOCUMENT_GENERATED" | "CLIENT_SIGNED" | "FREELANCER_SIGNED" | "LOCKED" | "INTEGRITY_CHECK" | "TAMPER_DETECTED"
+  description   String   @db.Text // Description textuelle de l'événement
+
+  // Données de l'événement
+  metadata      Json?    // Données additionnelles (certificat utilisé, hash, etc.)
+
+  // Chaîne de hash — chaque entrée stocke le hash de la précédente + ses propres données
+  // garantissant l'immuabilité (toute modification dans le passé est détectable)
+  previousHash  String?  // Hash de l'entrée précédente (null pour la première)
+  currentHash   String   @unique // Hash SHA-256 de cette entrée (previousHash + event + description + metadata + timestamp)
+
+  // Horodatage
+  createdAt     DateTime @default(now())
+
+  // Signature de l'entrée d'audit par le système (non répudiable)
+  systemSignature String? @db.Text // Signature RSA de currentHash par la clé maître du système
+
+  @@index([contractId, createdAt])
+  @@index([currentHash])
+  @@map("contract_audit_entries")
+}
+
 // ========== MODELS ==========
 
 /// Compte unique — un utilisateur possède un seul compte.
@@ -901,6 +933,14 @@ model Contract {
   // Document généré
   documentUrl       String?                   // URL ou chemin du document PDF/HTML généré
   documentGeneratedAt DateTime?               // Date de génération du document
+
+  // Verrouillage et intégrité
+  lockedAt          DateTime?                 // Date de verrouillage (après double signature)
+  lockedByCertificateId String?               // Dernier certificat ayant verrouillé
+  documentHash      String?                   // Hash SHA-256 du contenu du contrat au moment du verrouillage
+  isLocked          Boolean       @default(false) // true = contrat verrouillé, toute modification ultérieure invalide la signature
+
+  auditEntries      ContractAuditEntry[]
 
   milestones    Milestone[]
   messages      Message[]

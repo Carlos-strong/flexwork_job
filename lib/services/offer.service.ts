@@ -312,6 +312,45 @@ export class OfferService {
       };
     });
 
+    // ── Auto-génération du document contractuel ──────────
+    try {
+      const { getContractTemplateData, generateContractHtml } = await import("./contract-template.service");
+      const templateData = await getContractTemplateData(result.contract.id);
+      if (templateData) {
+        const html = generateContractHtml(templateData);
+        const documentPath = `contracts/${result.contract.id}/contrat.html`;
+        const fs = await import("fs");
+        const path = await import("path");
+        const dir = path.default.join(process.cwd(), "public", "uploads", "contracts", result.contract.id);
+        fs.default.mkdirSync(dir, { recursive: true });
+        fs.default.writeFileSync(path.default.join(dir, "contrat.html"), html, "utf-8");
+        const docUrl = `/uploads/contracts/${result.contract.id}/contrat.html`;
+
+        await prisma.contract.update({
+          where: { id: result.contract.id },
+          data: { documentUrl: docUrl, documentGeneratedAt: new Date() },
+        });
+        result.contract = { ...result.contract, documentUrl: docUrl };
+      }
+
+      // Enregistrer l'entrée d'audit initiale
+      const { SignatureService } = await import("./signature.service");
+      await SignatureService.addAuditEntry(
+        result.contract.id,
+        "CONTRACT_CREATED",
+        `Contrat créé suite à l'acceptation de l'offre pour "${offer.title}"`,
+        {
+          offerId: offer.id,
+          missionId: offer.application.mission.id,
+          totalBudget: offer.totalBudget,
+          freelancerId: offer.application.freelancer.id,
+        }
+      );
+    } catch (err) {
+      console.error("[OfferService.acceptOffer] Échec génération document/audit:", err);
+      // Non bloquant
+    }
+
     // Notifier les parties
     const clientUser = offer.application.mission.client.user;
     const freelanceUser = offer.application.freelancer.user;
