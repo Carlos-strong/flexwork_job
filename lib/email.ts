@@ -314,6 +314,52 @@ export const EmailTemplates = {
       </div>
     `,
   }),
+
+  /** Candidature consultée → confirmation au freelancer */
+  applicationViewed: (data: {
+    freelancerName: string;
+    missionTitle: string;
+    clientName: string;
+    applicationUrl?: string;
+  }) => ({
+    subject: `👀 Votre candidature a été consultée — ${data.missionTitle}`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #2D5BE3, #4f6fe8); padding: 32px; text-align: center; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0; font-size: 22px;">👀 Candidature consultée</h1>
+          <p style="color: #c7d7ff; margin: 8px 0 0; font-size: 14px;">Un client a regardé votre profil</p>
+        </div>
+        <div style="padding: 32px; background: #f9fafb; border-radius: 0 0 12px 12px;">
+          <p style="font-size: 16px; line-height: 1.6;">Bonjour <strong>${data.freelancerName}</strong>,</p>
+          <p style="font-size: 15px; line-height: 1.6; color: #374151;">
+            Bonne nouvelle ! <strong>${data.clientName}</strong> vient de consulter votre candidature
+            pour la mission <strong>« ${data.missionTitle} »</strong>.
+          </p>
+          <div style="background: #EEF2FD; border-left: 4px solid #2D5BE3; padding: 16px; border-radius: 0 8px 8px 0; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14px; color: #1e3a8a;">
+              💡 <strong>Conseil :</strong> Le client examine votre profil avec attention.
+              C'est le moment de vous assurer que votre présentation et vos tarifs sont à jour.
+            </p>
+          </div>
+          ${data.applicationUrl ? `
+          <div style="text-align: center; margin: 28px 0;">
+            <a href="${data.applicationUrl}"
+               style="display: inline-block; background: #2D5BE3; color: white; padding: 13px 32px;
+                      border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px;">
+              Voir ma candidature →
+            </a>
+          </div>
+          ` : ""}
+          <p style="color: #6b7280; font-size: 13px; margin-top: 24px;">
+            Restez disponible — une réponse du client pourrait arriver prochainement.
+          </p>
+        </div>
+        <p style="text-align: center; color: #9ca3af; font-size: 12px; margin-top: 16px;">
+          Flexwork — La plateforme qui connecte freelances et clients
+        </p>
+      </div>
+    `,
+  }),
 };
 
 export type TemplateName = keyof typeof EmailTemplates;

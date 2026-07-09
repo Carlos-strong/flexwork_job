@@ -8,7 +8,7 @@ import {
 } from "@/lib/api-gateway";
 import { enqueueJob } from "@/lib/queue";
 import { prisma } from "@/lib/prisma";
-import { applications } from "@/lib/mock-data";
+import { applications, persistMockStore } from "@/lib/mock-data";
 import {
   ALLOWED_TRANSITIONS,
   logApplicationAudit,
@@ -32,7 +32,7 @@ const TO_PRISMA: Partial<Record<ApplicationStatus, string>> = {
 
 /** Mapping Prisma → recruitment */
 const FROM_PRISMA: Record<string, ApplicationStatus> = {
-  UNREAD: "SUBMITTED", READ: "READ", SHORTLISTED: "SHORTLISTED",
+  UNREAD: "UNREAD", READ: "READ", SHORTLISTED: "SHORTLISTED",
   DISCUSSION: "DISCUSSION", INTERVIEW: "INTERVIEW", OFFER_SENT: "OFFER_SENT",
   OFFER_ACCEPTED: "OFFER_ACCEPTED", OFFER_DECLINED: "OFFER_DECLINED",
   ARCHIVED: "ARCHIVED", REJECTED: "REJECTED",
@@ -83,8 +83,11 @@ export const PUT = createApiHandler({
       );
     }
 
-    // Auto-lecture : si UNREAD/SUBMITTED → marquer READ avant action
-    if (currentStatus === "SUBMITTED" && newStatus !== "READ") {
+    // Auto-lecture : si UNREAD/SUBMITTED/IDENTITY_PENDING (déjà validé) → marquer READ avant action
+    if (
+      (currentStatus === "SUBMITTED" || currentStatus === "UNREAD" || currentStatus === "IDENTITY_PENDING") &&
+      newStatus !== "READ"
+    ) {
       try {
         await prisma.application.update({
           where: { id: ctx.params.id },
@@ -103,7 +106,7 @@ export const PUT = createApiHandler({
       });
     } catch {
       const mockApp = applications.find((a) => a.id === ctx.params.id);
-      if (mockApp) mockApp.status = newStatus;
+      if (mockApp) { mockApp.status = newStatus; persistMockStore(); }
     }
 
     // Audit
@@ -117,6 +120,36 @@ export const PUT = createApiHandler({
     });
 
     // Jobs contextuels
+    if (
+      newStatus === "READ" &&
+      (currentStatus === "UNREAD" || currentStatus === "SUBMITTED" || currentStatus === "IDENTITY_PENDING")
+    ) {
+      // Notification freelancer : sa candidature a été consultée
+      prisma.application.findUnique({
+        where: { id: ctx.params.id },
+        select: {
+          mission: { select: { title: true, client: { select: { companyName: true, user: { select: { firstName: true, lastName: true } } } } } },
+          freelancer: { select: { id: true, user: { select: { id: true, email: true, firstName: true, lastName: true } } } },
+        },
+      }).then((detail) => {
+        if (!detail) return;
+        const { mission, freelancer } = detail;
+        const freelancerName = `${freelancer.user.firstName ?? ""} ${freelancer.user.lastName ?? ""}`.trim() || "Freelancer";
+        const clientName = mission.client.companyName
+          || `${mission.client.user.firstName ?? ""} ${mission.client.user.lastName ?? ""}`.trim()
+          || "Un client";
+        return enqueueJob("APPLICATION_VIEWED", {
+          applicationId: ctx.params.id,
+          missionId: app!.missionId,
+          missionTitle: mission.title,
+          freelancerId: freelancer.id,
+          freelancerUserId: freelancer.user.id,
+          freelancerName,
+          freelancerEmail: freelancer.user.email ?? "",
+          clientName,
+        });
+      }).catch(() => {});
+    }
     if (newStatus === "SHORTLISTED") {
       await enqueueJob("APPLICATION_SHORTLISTED", { applicationId: ctx.params.id }).catch(() => {});
     }

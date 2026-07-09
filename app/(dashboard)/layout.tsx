@@ -5,6 +5,7 @@ import { unstable_cache } from "next/cache";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { ProfileSwitcher } from "@/components/layout/profile-switcher";
 import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
+import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { prisma } from "@/lib/prisma";
 
 // Requête Prisma mise en cache 5 minutes par userId — évite un aller-retour BDD à chaque navigation
@@ -30,6 +31,7 @@ const clientNav = [
   { href: "/dashboard/client/missions/archives", label: "Archives", icon: "📦" },
   { href: "/dashboard/client/freelancers", label: "Freelances", icon: "🔍" },
   { href: "/dashboard/client/contrats", label: "Contrats", icon: "📝" },
+  { href: "/dashboard/client/contrats/offres", label: "  └ Offres", icon: "📨" },
   { href: "/dashboard/client/messages", label: "Messages", icon: "💬" },
   { href: "/dashboard/client/paiements", label: "Paiements", icon: "💳" },
   { href: "/dashboard/client/entreprise", label: "Entreprise", icon: "🏢" },
@@ -42,6 +44,7 @@ const freelancerNav = [
   { href: "/dashboard/freelancer/recherche", label: "Missions", icon: "🔍" },
   { href: "/dashboard/freelancer/candidatures", label: "Candidatures", icon: "📩" },
   { href: "/dashboard/freelancer/contrats", label: "Contrats", icon: "📝" },
+  { href: "/dashboard/freelancer/contrats/offres", label: "  └ Offres", icon: "📨" },
   { href: "/dashboard/freelancer/profil", label: "Profil pro", icon: "👤" },
   { href: "/dashboard/freelancer/messages", label: "Messages", icon: "💬" },
   { href: "/dashboard/freelancer/paiements", label: "Paiements", icon: "💳" },
@@ -121,10 +124,10 @@ export default async function DashboardLayout({
           <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
             <div className="flex h-16 items-center justify-between px-6">
               <h1 className="text-lg font-semibold">Mon espace</h1>
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-[#5A5750]">{name}</span>
-                <LogoutButton />
-              </div>
+              <DashboardHeader
+                userId={(session.user as { id?: string }).id || ""}
+                name={name}
+              />
             </div>
           </header>
 

@@ -3,7 +3,6 @@ import { LogoutButton } from "@/components/layout/logout-button";
 
 const backOfficeNav = [
   { href: "/backoffice", label: "Dashboard", icon: "📊" },
-  { href: "/backoffice/kyc", label: "KYC", icon: "🛡️" },
   { href: "/backoffice/catalog", label: "Taxonomie", icon: "🗂️" },
   { href: "/backoffice/locations", label: "Localisation", icon: "🌍" },
   { href: "/backoffice/finance", label: "Finance", icon: "💰" },

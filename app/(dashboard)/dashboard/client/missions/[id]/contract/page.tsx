@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { ChatBox } from "@/components/chat/chat-box";
 import { GoogleMeetButton } from "@/components/chat/google-meet-button";
@@ -45,6 +45,7 @@ export default function ClientContractWorkroomPage() {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [approving, setApproving] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const esRef = useRef<EventSource | null>(null);
 
   const loadData = async () => {
     try {
@@ -81,6 +82,48 @@ export default function ClientContractWorkroomPage() {
   useEffect(() => {
     loadData();
   }, [params.id]);
+
+  // SSE — synchronisation temps réel des états contrat/milestone
+  useEffect(() => {
+    if (!contract?.id) return;
+    const contractId = contract.id;
+
+    const connect = () => {
+      const es = new EventSource(`/api/sse?room=${encodeURIComponent(contractId)}`);
+      esRef.current = es;
+
+      es.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          if (event.type === "contract_update") {
+            setContract((prev) => prev ? { ...prev, status: event.data.status as string } : prev);
+          }
+          if (event.type === "milestone_update") {
+            setMilestones((prev) =>
+              prev.map((m) =>
+                m.id === event.data.milestoneId
+                  ? { ...m, status: event.data.status as string }
+                  : m
+              )
+            );
+          }
+        } catch { /* ignore */ }
+      };
+
+      es.onerror = () => {
+        es.close();
+        esRef.current = null;
+        setTimeout(connect, 3000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      esRef.current?.close();
+      esRef.current = null;
+    };
+  }, [contract?.id]);
 
   const handleMilestoneAction = async (milestoneId: string, newStatus: string) => {
     setApproving(milestoneId);
@@ -242,6 +285,7 @@ export default function ClientContractWorkroomPage() {
           currentUserId={currentUser?.id || "guest"}
           currentUserName={currentUser?.name || "Client"}
           otherPartyName={contract.freelancerName}
+          otherPartyId={contract.freelancerId || ""}
         />
       )}
 

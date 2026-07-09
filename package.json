@@ -11,15 +11,17 @@
     "db:seed": "npx prisma db seed",
     "seed": "npx prisma db seed",
     "workers": "npx tsx lib/workers.ts",
+    "ws": "npx tsx server/ws-server.ts",
     "mailpit": "docker run -d --rm -p 1025:1025 -p 8025:8025 axllent/mailpit",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "setup": "npm run docker:up && npm run db:push && npm run db:seed",
     "simulate": "npx tsx scripts/simulate.ts",
+    "turn": "node scripts/turn-server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "laragon:setup": "copy .env.laragon .env.local /Y && npx prisma db push && npx prisma db seed",
-    "dev:all": "concurrently \"npm run docker:up\" \"next dev\" \"npx tsx lib/workers.ts\""
+    "dev:all": "concurrently \"npm run docker:up\" \"next dev\" \"npx tsx lib/workers.ts\" \"npx tsx server/ws-server.ts\""
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
@@ -31,6 +33,7 @@
     "bullmq": "^5.78.1",
     "clsx": "^2.1.1",
     "ioredis": "^5.11.1",
+    "lucide-react": "^1.23.0",
     "next": "14.2.35",
     "next-auth": "^4.24.14",
     "next-intl": "^4.13.0",
@@ -39,6 +42,8 @@
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.79.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3"

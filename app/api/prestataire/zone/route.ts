@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * POST /api/prestataire/zone
  * Définit la zone d'intervention d'un prestataire pour un métier donné.

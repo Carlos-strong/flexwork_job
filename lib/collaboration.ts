@@ -8,6 +8,10 @@
  *   - Audit trail
  */
 
+import { saveToDisk, loadFromDisk } from "@/lib/persist";
+
+const STORAGE_KEY = "collaboration";
+
 // ── Types ──────────────────────────────────────
 
 export type MessageType = "TEXT" | "FILE" | "IMAGE" | "VOICE" | "SYSTEM";
@@ -73,19 +77,74 @@ export interface MessageAudit {
 }
 
 // ── Stores mock ────────────────────────────────
+// Utilise globalThis pour survivre aux hot-reloads Next.js en développement.
+// En production, ces données doivent être persistées en base (Prisma).
 
-export const conversations: Conversation[] = [];
-export const participants: ConversationParticipant[] = [];
-export const chatMessages: ChatMessage[] = [];
-export const meetings: Meeting[] = [];
-export const meetingLogs: MeetingLog[] = [];
-export const messageAudits: MessageAudit[] = [];
+interface CollabStore {
+  conversations: Conversation[];
+  participants: ConversationParticipant[];
+  chatMessages: ChatMessage[];
+  meetings: Meeting[];
+  meetingLogs: MeetingLog[];
+  messageAudits: MessageAudit[];
+  idCounter: number;
+}
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __collabStore: CollabStore | undefined;
+}
+
+function loadCollabStore(): CollabStore {
+  // 1. Vérifier globalThis (déjà chargé = hot-reload)
+  if (globalThis.__collabStore) {
+    return globalThis.__collabStore;
+  }
+
+  // 2. Tenter de charger depuis le disque (survit aux redémarrages)
+  const saved = loadFromDisk<CollabStore | null>(STORAGE_KEY, null);
+  if (saved) {
+    globalThis.__collabStore = saved;
+    return saved;
+  }
+
+  // 3. Valeur par défaut (première exécution)
+  const defaults: CollabStore = {
+    conversations: [],
+    participants: [],
+    chatMessages: [],
+    meetings: [],
+    meetingLogs: [],
+    messageAudits: [],
+    idCounter: 1,
+  };
+  globalThis.__collabStore = defaults;
+  return defaults;
+}
+
+const _store: CollabStore = loadCollabStore();
+
+// Exports pointant sur les mêmes tableaux persistants
+export const conversations    = _store.conversations;
+export const participants     = _store.participants;
+export const chatMessages     = _store.chatMessages;
+export const meetings         = _store.meetings;
+export const meetingLogs      = _store.meetingLogs;
+export const messageAudits    = _store.messageAudits;
+
+// ── Persistance auto ───────────────────────────
+
+/** Sauvegarde immédiate du store complet sur disque */
+function persistStore(): void {
+  saveToDisk(STORAGE_KEY, _store);
+}
 
 // ── Helpers ────────────────────────────────────
 
-let idCounter = 1;
 export function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${idCounter++}`;
+  const id = `${prefix}-${Date.now()}-${_store.idCounter++}`;
+  persistStore(); // sauvegarder le compteur
+  return id;
 }
 
 /** Crée une conversation automatiquement à la création d'un contrat */
@@ -111,6 +170,7 @@ export function createConversation(params: {
     { id: generateId("part"), conversationId: conv.id, userId: params.freelancerId, userName: params.freelancerName, role: "FREELANCER" },
   );
 
+  persistStore(); // 💾 sauvegarde sur disque
   return conv;
 }
 
@@ -134,6 +194,7 @@ export function addSystemMessage(conversationId: string, content: string): ChatM
     userId: "system",
     createdAt: msg.createdAt,
   });
+  persistStore(); // 💾 sauvegarde sur disque
   return msg;
 }
 
@@ -161,6 +222,7 @@ export function addTextMessage(params: {
     userId: params.senderId,
     createdAt: msg.createdAt,
   });
+  persistStore(); // 💾 sauvegarde sur disque
   return msg;
 }
 
@@ -190,6 +252,7 @@ export function createMeeting(params: {
     createdAt: new Date().toISOString(),
   };
   meetings.push(meeting);
+  persistStore(); // 💾 sauvegarde sur disque
   return meeting;
 }
 
@@ -217,4 +280,5 @@ export function logMeetingEvent(meetingId: string, event: "started" | "ended"): 
       );
     }
   }
+  persistStore(); // 💾 sauvegarde sur disque
 }

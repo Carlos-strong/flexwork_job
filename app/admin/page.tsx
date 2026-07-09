@@ -36,10 +36,12 @@ export default function AdminDashboardPage() {
         const totalPayments = paymentList.length;
         const completionRate = totalPayments > 0 ? Math.round((succeededPayments / totalPayments) * 100) : 0;
 
-        // Compter les profils freelances en attente de validation
-        const pendingKycCount = userList.filter((u: { freelancerProfile?: { isValidated: boolean } | null }) =>
-          u.freelancerProfile && !u.freelancerProfile.isValidated
-        ).length;
+        // Compter les KYC en attente via la même API que le dashboard KYC
+        const kycRes = await fetch("/api/kyc/freelances");
+        const kycData = kycRes.ok ? await kycRes.json() : { total: 0 };
+        const companiesRes = await fetch("/api/kyc/companies");
+        const companiesData = companiesRes.ok ? await companiesRes.json() : { total: 0 };
+        const pendingKycCount = (kycData.total || 0) + (companiesData.total || 0);
 
         // Compter les profils (un utilisateur peut avoir les deux)
         const freelancerCount = userList.filter((u: { freelancerProfile: unknown }) => u.freelancerProfile).length;

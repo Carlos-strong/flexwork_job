@@ -11,7 +11,8 @@ import { enqueueJob } from "@/lib/queue";
 import { escrow } from "@/lib/escrow";
 import type { EscrowProvider } from "@/lib/escrow";
 import { createConversation, addSystemMessage, generateId, chatMessages, conversations } from "@/lib/collaboration";
-import { contracts } from "@/lib/mock-data";
+import { contracts, persistMockStore } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
 import type { ApiContext } from "@/lib/api-gateway";
 
 // ── GET /api/contracts ─────────────────────────
@@ -19,6 +20,38 @@ export const GET = createApiHandler({
   methods: ["GET"],
   async handler(_req: NextRequest, ctx: ApiContext) {
     const { page, pageSize, skip } = getPaginationParams(ctx.searchParams);
+
+    try {
+      const [dbContracts, total] = await Promise.all([
+        prisma.contract.findMany({
+          skip,
+          take: pageSize,
+          orderBy: { createdAt: "desc" },
+          include: { mission: { select: { title: true, clientId: true } } },
+        }),
+        prisma.contract.count(),
+      ]);
+      return apiPaginated(
+        dbContracts.map((c) => ({
+          id: c.id,
+          missionId: c.missionId,
+          missionTitle: c.mission?.title ?? "Mission",
+          clientId: c.mission?.clientId,
+          freelancerId: c.freelancerId,
+          status: c.status,
+          contractType: c.contractType,
+          totalBudget: c.totalBudget,
+          escrowAmount: c.escrowAmount,
+          startDate: c.startDate.toISOString(),
+          endDate: c.endDate?.toISOString() ?? null,
+          createdAt: c.createdAt.toISOString(),
+        })),
+        page, pageSize, total
+      );
+    } catch {
+      // DB indisponible — fallback mock
+    }
+
     const total = contracts.length;
     const paginated = contracts.slice(skip, skip + pageSize);
     return apiPaginated(paginated, page, pageSize, total);
@@ -72,6 +105,7 @@ export const POST = createApiHandler({
     };
 
     contracts.push(contract);
+    persistMockStore();
 
     // 2. Notifier création contrat
     await enqueueJob("CONTRACT_CREATED", {
@@ -102,6 +136,7 @@ export const POST = createApiHandler({
     contract.stripePaymentIntentId = escrowResult.stripePaymentIntentId;
     contract.stripeClientSecret = escrowResult.stripeClientSecret;
     contract.status = "ACTIVE";
+    persistMockStore();
 
     // 5. Créer la conversation + messages système
     // 5a. Vérifier si une conversation pré-contrat existe (créée lors du SHORTLISTED)
@@ -118,7 +153,7 @@ export const POST = createApiHandler({
 
     const conversation = preContractConv || createConversation({
       contractId,
-      title: `Contrat : ${missionTitle}`,
+      title: missionTitle,
       clientId: body.clientId || "",
       clientName: body.clientName || "Client",
       freelancerId: body.freelancerId,

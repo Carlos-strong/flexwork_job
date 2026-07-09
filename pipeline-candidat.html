@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Gestion de l'offre — Vue prestataire</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --ink:#14213D;
+  --paper:#F5F6F4;
+  --panel:#FFFFFF;
+  --line:#DADFDD;
+  --green:#1F7A5C;
+  --green-soft:#E4F1EC;
+  --amber:#B8720A;
+  --amber-soft:#FBEDD8;
+  --red:#B23A2E;
+  --red-soft:#F8E7E4;
+  --muted:#6B7280;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+
+.app{max-width:900px;margin:0 auto;padding:40px 32px 80px;}
+
+/* ---- HEADER ---- */
+.offer-head{
+  display:flex;align-items:flex-start;gap:18px;
+  padding:24px 26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:28px;
+}
+.client-avatar{
+  width:52px;height:52px;border-radius:50%;flex-shrink:0;
+  background:var(--ink);color:#EDEFF5;font-family:'Fraunces',serif;font-size:19px;font-weight:500;
+  display:flex;align-items:center;justify-content:center;
+}
+.offer-head .oh-main{flex:1;min-width:0;}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--green);margin-bottom:6px;
+}
+.offer-head h1{
+  font-family:'Fraunces',serif;font-weight:500;font-size:23px;
+  margin:0 0 4px 0;letter-spacing:-0.01em;
+}
+.offer-head .oh-sub{font-size:13.5px;color:var(--muted);}
+.offer-head .oh-sub b{color:var(--ink);font-weight:600;}
+.status-pill{
+  font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;
+  padding:5px 12px;border-radius:20px;white-space:nowrap;flex-shrink:0;
+}
+.sp-pending{background:var(--amber-soft);color:var(--amber);}
+.sp-negotiating{background:var(--amber-soft);color:var(--amber);}
+.sp-accepted{background:var(--green-soft);color:var(--green);}
+.sp-declined{background:var(--red-soft);color:var(--red);}
+
+/* ---- SECTIONS ---- */
+.section{margin-bottom:28px;}
+.section-label{
+  font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+  font-weight:600;margin-bottom:12px;
+}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;}
+
+.toggle-group{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content;margin-bottom:20px;}
+.toggle-opt{padding:8px 18px;font-size:13px;font-weight:600;color:var(--muted);}
+.toggle-opt.on{background:var(--green);color:#fff;}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:22px 24px;}
+.form-grid .full{grid-column:1/-1;}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.field .fake-field{
+  background:var(--paper);border:1px solid var(--line);border-radius:8px;
+  padding:11px 14px;font-size:13.5px;color:var(--ink);
+}
+
+/* ---- Milestones table (same pattern as étape 3, read/negotiate mode) ---- */
+.milestones-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.milestones-head h3{font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0;font-weight:600;}
+.hint{font-size:12px;color:var(--muted);}
+table.milestones{width:100%;border-collapse:collapse;}
+table.milestones thead th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);
+  padding:10px 12px;border-bottom:1px solid var(--line);font-weight:600;
+}
+table.milestones tbody td{
+  padding:12px 12px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:top;
+}
+table.milestones tbody tr:last-child td{border-bottom:none;}
+table.milestones td.idx{font-family:'IBM Plex Mono',monospace;color:var(--muted);width:24px;}
+table.milestones td.num{font-family:'IBM Plex Mono',monospace;text-align:right;white-space:nowrap;}
+table.milestones td.desc{max-width:230px;}
+table.milestones tfoot td{padding:12px;font-weight:700;font-family:'IBM Plex Mono',monospace;border-top:2px solid var(--ink);}
+table.milestones tfoot td.label{font-family:'Inter',sans-serif;font-weight:600;color:var(--muted);text-align:right;}
+table.milestones tfoot td.old-total{
+  font-family:'IBM Plex Mono',monospace;color:var(--muted);text-decoration:line-through;
+  font-weight:500;font-size:12.5px;display:block;
+}
+
+.price-old{
+  font-family:'IBM Plex Mono',monospace;color:var(--muted);text-decoration:line-through;
+  font-size:11.5px;display:block;
+}
+.price-new{color:var(--amber);}
+.tag-modified{
+  display:inline-block;margin-top:4px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;
+  background:var(--amber-soft);color:var(--amber);padding:2px 7px;border-radius:20px;
+}
+
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.row-icon-btn{
+  width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:#fff;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12.5px;color:var(--muted);
+}
+.row-icon-btn:hover{border-color:var(--amber);color:var(--amber);}
+.row-icon-btn.reset:hover{border-color:var(--green);color:var(--green);}
+
+/* ---- Response note ---- */
+.note-box{padding:18px 20px;}
+.note-box textarea{
+  width:100%;min-height:80px;resize:vertical;
+  background:var(--paper);border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;font-size:13.5px;color:var(--ink);font-family:'Inter',sans-serif;line-height:1.5;
+}
+.note-box textarea:focus{outline:none;border-color:var(--green);}
+.note-box textarea::placeholder{color:#9aa0a6;}
+
+/* ---- Action bar ---- */
+.action-bar{
+  position:sticky;bottom:0;
+  display:flex;align-items:center;gap:12px;
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:16px 20px;margin-top:8px;
+  box-shadow:0 -8px 24px rgba(20,33,61,0.06);
+}
+.action-bar .ab-total{margin-right:auto;}
+.ab-total .ab-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;}
+.ab-total .ab-amount{font-family:'Fraunces',serif;font-size:20px;font-weight:500;}
+.ab-total .ab-amount .old{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--muted);text-decoration:line-through;margin-right:6px;}
+
+.btn{padding:10px 18px;border-radius:8px;font-size:13.5px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;font-family:'Inter',sans-serif;transition:all .15s ease;}
+.btn:hover{border-color:#B9C0BC;}
+.btn.primary{background:var(--green);border-color:var(--green);color:#fff;}
+.btn.primary:hover{background:#186B50;}
+.btn.ghost-red{color:var(--red);}
+.btn.ghost-red:hover{background:var(--red-soft);border-color:var(--red);}
+.btn.ghost-amber{color:var(--amber);}
+.btn.ghost-amber:hover{background:var(--amber-soft);border-color:var(--amber);}
+.btn:disabled{opacity:.4;cursor:default;pointer-events:none;}
+
+/* ---- Result states ---- */
+.result-head{display:flex;align-items:center;gap:14px;padding:22px;border-radius:10px;color:#fff;margin-bottom:24px;}
+.result-head.accepted{background:var(--green);}
+.result-head.declined{background:var(--red);}
+.result-head .check{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.result-head .rh-title{font-family:'Fraunces',serif;font-size:19px;font-weight:500;}
+.result-head .rh-sub{font-size:12.5px;opacity:.85;margin-top:2px;}
+.hidden{display:none;}
+
+/* ---- Modal (contre-proposition) ---- */
+.modal-overlay{
+  display:none;position:fixed;inset:0;background:rgba(20,33,61,0.45);
+  align-items:center;justify-content:center;z-index:50;
+}
+.modal-overlay.active{display:flex;}
+.modal-card{
+  background:var(--panel);border-radius:12px;width:480px;max-width:90vw;
+  box-shadow:0 20px 60px rgba(20,33,61,0.25);
+}
+.modal-head{display:flex;align-items:center;gap:14px;padding:20px 24px;border-bottom:1px solid var(--line);}
+.modal-head .m-name{font-family:'Fraunces',serif;font-size:18px;font-weight:500;}
+.modal-head .m-sub{font-size:12.5px;color:var(--muted);margin-top:2px;}
+.modal-close{margin-left:auto;width:30px;height:30px;border-radius:50%;border:1px solid var(--line);background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);flex-shrink:0;}
+.modal-body{padding:20px 24px;}
+.mform-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.mform-grid .full{grid-column:1/-1;}
+.mform-grid label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.form-input{
+  width:100%;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  padding:10px 12px;font-size:13.5px;color:var(--ink);font-family:'Inter',sans-serif;
+}
+.form-input:focus{outline:none;border-color:var(--amber);}
+.form-input[readonly]{background:#F5F6F4;color:var(--muted);}
+.modal-actions{padding:16px 24px;border-top:1px solid var(--line);display:flex;gap:10px;}
+
+/* Decline modal */
+.modal-card.narrow{width:420px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="offer-head">
+    <div class="client-avatar">TC</div>
+    <div class="oh-main">
+      <div class="eyebrow">Offre reçue · JOB-4471</div>
+      <h1>Développement d'un module de paiement</h1>
+      <div class="oh-sub">De <b>TechCorp SAS</b> · Prix fixe · reçue le 5 juillet 2026</div>
+    </div>
+    <span class="status-pill sp-pending" id="statusPill">En attente de réponse</span>
+  </div>
+
+  <!-- MAIN (pending/negotiating state) -->
+  <div id="mainOffer">
+
+    <div class="section">
+      <div class="section-label">Détails de la mission</div>
+      <div class="card">
+        <div class="toggle-group" style="margin:22px 0 0 24px;">
+          <div class="toggle-opt on">Prix fixe</div>
+          <div class="toggle-opt">Taux horaire</div>
+        </div>
+        <div class="form-grid">
+          <div class="field full">
+            <label>Description</label>
+            <div class="fake-field" style="height:56px;">Intégration Stripe, gestion des webhooks et tableau de bord de facturation.</div>
+          </div>
+          <div class="field">
+            <label>Date de début souhaitée</label>
+            <div class="fake-field">10 juillet 2026</div>
+          </div>
+          <div class="field">
+            <label>Durée estimée</label>
+            <div class="fake-field">6 semaines</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="milestones-head">
+        <h3>Jalons proposés</h3>
+        <div class="hint">Cliquez sur ✎ pour proposer un nouveau prix ou délai</div>
+      </div>
+      <div class="card">
+        <table class="milestones">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Description</th>
+              <th>Unité</th>
+              <th>Prix unitaire</th>
+              <th>Prix total</th>
+              <th>Délai d'exécution</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="milestonesBody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="label">Montant total de l'offre</td>
+              <td class="num" id="milestonesTotal">0 €</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-label">Message pour le client</div>
+      <div class="card note-box">
+        <textarea id="responseNote" placeholder="Ajoutez un commentaire pour TechCorp SAS — par exemple pour justifier une contre-proposition, ou confirmer votre disponibilité…"></textarea>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <div class="ab-total">
+        <div class="ab-label">Vous répondez avec</div>
+        <div class="ab-amount" id="abAmount"><span class="old hidden" id="abOld"></span><span id="abCurrent">3 200 €</span></div>
+      </div>
+      <button class="btn ghost-red" onclick="openDecline()">Décliner</button>
+      <button class="btn ghost-amber" id="counterBtn" onclick="sendCounter()" disabled>Envoyer ma contre-proposition</button>
+      <button class="btn primary" onclick="acceptOffer()">Accepter l'offre</button>
+    </div>
+
+  </div>
+
+  <!-- RESULT: accepted -->
+  <div class="hidden" id="resultAccepted">
+    <div class="result-head accepted">
+      <div class="check">✓</div>
+      <div>
+        <div class="rh-title">Offre acceptée</div>
+        <div class="rh-sub">Le contrat va être généré avec TechCorp SAS — vous recevrez une notification dès qu'il sera actif.</div>
+      </div>
+    </div>
+    <button class="btn" onclick="resetAll()">← Revenir à l'offre</button>
+  </div>
+
+  <!-- RESULT: countered -->
+  <div class="hidden" id="resultCountered">
+    <div class="result-head" style="background:var(--amber);">
+      <div class="check">↔</div>
+      <div>
+        <div class="rh-title">Contre-proposition envoyée</div>
+        <div class="rh-sub">TechCorp SAS va examiner vos modifications et vous répondra prochainement.</div>
+      </div>
+    </div>
+    <button class="btn" onclick="resetAll()">← Revenir à l'offre</button>
+  </div>
+
+  <!-- RESULT: declined -->
+  <div class="hidden" id="resultDeclined">
+    <div class="result-head declined">
+      <div class="check">✕</div>
+      <div>
+        <div class="rh-title">Offre déclinée</div>
+        <div class="rh-sub" id="declineSummary">TechCorp SAS a été informé de votre décision.</div>
+      </div>
+    </div>
+    <button class="btn" onclick="resetAll()">← Revenir à l'offre</button>
+  </div>
+
+</div>
+
+<!-- Modal: contre-proposition sur un jalon -->
+<div class="modal-overlay" id="counterModal" onclick="if(event.target===this) closeCounterModal()">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <div class="m-name">Proposer une modification</div>
+        <div class="m-sub" id="cModalSub">Jalon 1</div>
+      </div>
+      <div class="modal-close" onclick="closeCounterModal()">✕</div>
+    </div>
+    <div class="modal-body">
+      <div class="mform-grid">
+        <div class="full">
+          <label>Description</label>
+          <input class="form-input" id="cDesc" type="text" readonly>
+        </div>
+        <div>
+          <label>Quantité</label>
+          <input class="form-input" id="cQty" type="number" min="1" step="1" oninput="updateCounterTotal()">
+        </div>
+        <div>
+          <label>Prix unitaire proposé (€)</label>
+          <input class="form-input" id="cUnitPrice" type="number" min="0" step="10" oninput="updateCounterTotal()">
+        </div>
+        <div class="full">
+          <label>Prix total proposé (€)</label>
+          <input class="form-input" id="cTotal" type="text" readonly>
+        </div>
+        <div class="full">
+          <label>Délai d'exécution proposé</label>
+          <input class="form-input" id="cDelay" type="text">
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <div class="btn" onclick="resetMilestone()">Rétablir l'original</div>
+      <div class="btn" onclick="closeCounterModal()" style="margin-left:auto;">Annuler</div>
+      <div class="btn primary" style="background:var(--amber);border-color:var(--amber);" onclick="applyCounter()">Appliquer</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: décliner -->
+<div class="modal-overlay" id="declineModal" onclick="if(event.target===this) closeDecline()">
+  <div class="modal-card narrow">
+    <div class="modal-head">
+      <div>
+        <div class="m-name">Décliner l'offre</div>
+        <div class="m-sub">Un motif aide le client à comprendre votre décision</div>
+      </div>
+      <div class="modal-close" onclick="closeDecline()">✕</div>
+    </div>
+    <div class="modal-body">
+      <label style="display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;">Motif (optionnel)</label>
+      <textarea id="declineReason" class="form-input" style="min-height:80px;resize:vertical;" placeholder="Ex. Le budget ne correspond pas à la charge de travail estimée…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <div class="btn" onclick="closeDecline()">Annuler</div>
+      <div class="btn" style="margin-left:auto;background:var(--red);border-color:var(--red);color:#fff;" onclick="confirmDecline()">Confirmer le refus</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* --- Data: offer as sent by client --- */
+const originalMilestones = [
+  {desc:"Intégration Stripe (paiement & abonnements)", unit:"Forfait", qty:1, unitPrice:1500, delay:"2 semaines"},
+  {desc:"Gestion des webhooks & réconciliation", unit:"Forfait", qty:1, unitPrice:700, delay:"1 semaine"},
+  {desc:"Tableau de bord de facturation", unit:"Forfait", qty:1, unitPrice:1000, delay:"3 semaines"}
+];
+let milestones = originalMilestones.map(m=>({...m, modified:false}));
+let counterIndex = null;
+
+function fmtEuro(n){ return n.toLocaleString('fr-FR')+' €'; }
+
+function renderMilestones(){
+  const body = document.getElementById('milestonesBody');
+  body.innerHTML = milestones.map((m,i)=>{
+    const orig = originalMilestones[i];
+    const total = m.qty*m.unitPrice;
+    const origTotal = orig.qty*orig.unitPrice;
+    const priceCell = m.modified
+      ? '<span class="price-old">'+fmtEuro(orig.unitPrice)+'</span><span class="price-new">'+fmtEuro(m.unitPrice)+'</span>'
+      : fmtEuro(m.unitPrice);
+    const totalCell = m.modified
+      ? '<span class="price-old">'+fmtEuro(origTotal)+'</span><span class="price-new">'+fmtEuro(total)+'</span>'
+      : fmtEuro(total);
+    const delayCell = m.modified && m.delay!==orig.delay
+      ? '<span class="price-old">'+orig.delay+'</span><span class="price-new">'+m.delay+'</span>'
+      : m.delay;
+    return '<tr>'+
+      '<td class="idx">'+String(i+1).padStart(2,'0')+'</td>'+
+      '<td class="desc">'+m.desc+(m.modified?'<span class="tag-modified">Modifié</span>':'')+'</td>'+
+      '<td>'+m.unit+(m.qty>1?' × '+m.qty:'')+'</td>'+
+      '<td class="num">'+priceCell+'</td>'+
+      '<td class="num">'+totalCell+'</td>'+
+      '<td>'+delayCell+'</td>'+
+      '<td><div class="row-actions">'+
+        '<button class="row-icon-btn" title="Proposer une modification" onclick="openCounterModal('+i+')">✎</button>'+
+        (m.modified?'<button class="row-icon-btn reset" title="Rétablir l\'original" onclick="resetMilestoneAt('+i+')">↺</button>':'')+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+
+  const grandTotal = milestones.reduce((s,m)=>s+m.qty*m.unitPrice,0);
+  const origGrandTotal = originalMilestones.reduce((s,m)=>s+m.qty*m.unitPrice,0);
+  const anyModified = milestones.some(m=>m.modified);
+
+  document.getElementById('milestonesTotal').textContent = fmtEuro(grandTotal);
+
+  const abOld = document.getElementById('abOld');
+  const abCurrent = document.getElementById('abCurrent');
+  if(anyModified){
+    abOld.textContent = fmtEuro(origGrandTotal);
+    abOld.classList.remove('hidden');
+    abCurrent.textContent = fmtEuro(grandTotal);
+  } else {
+    abOld.classList.add('hidden');
+    abCurrent.textContent = fmtEuro(grandTotal);
+  }
+  document.getElementById('counterBtn').disabled = !anyModified;
+}
+
+/* --- Counter-offer modal --- */
+function openCounterModal(i){
+  counterIndex = i;
+  const m = milestones[i];
+  document.getElementById('cModalSub').textContent = 'Jalon '+String(i+1).padStart(2,'0');
+  document.getElementById('cDesc').value = m.desc;
+  document.getElementById('cQty').value = m.qty;
+  document.getElementById('cUnitPrice').value = m.unitPrice;
+  document.getElementById('cDelay').value = m.delay;
+  updateCounterTotal();
+  document.getElementById('counterModal').classList.add('active');
+}
+function closeCounterModal(){
+  document.getElementById('counterModal').classList.remove('active');
+}
+function updateCounterTotal(){
+  const qty = parseFloat(document.getElementById('cQty').value)||0;
+  const price = parseFloat(document.getElementById('cUnitPrice').value)||0;
+  document.getElementById('cTotal').value = fmtEuro(qty*price);
+}
+function applyCounter(){
+  const i = counterIndex;
+  const orig = originalMilestones[i];
+  const qty = parseFloat(document.getElementById('cQty').value)||orig.qty;
+  const unitPrice = parseFloat(document.getElementById('cUnitPrice').value)||orig.unitPrice;
+  const delay = document.getElementById('cDelay').value.trim()||orig.delay;
+  const modified = (qty!==orig.qty || unitPrice!==orig.unitPrice || delay!==orig.delay);
+  milestones[i] = {...milestones[i], qty, unitPrice, delay, modified};
+  renderMilestones();
+  updateStatusPill();
+  closeCounterModal();
+}
+function resetMilestoneAt(i){
+  milestones[i] = {...originalMilestones[i], modified:false};
+  renderMilestones();
+  updateStatusPill();
+}
+function resetMilestone(){
+  if(counterIndex===null) return;
+  resetMilestoneAt(counterIndex);
+  closeCounterModal();
+}
+
+function updateStatusPill(){
+  const anyModified = milestones.some(m=>m.modified);
+  const pill = document.getElementById('statusPill');
+  if(anyModified){
+    pill.className = 'status-pill sp-negotiating';
+    pill.textContent = 'Modifications en cours';
+  } else {
+    pill.className = 'status-pill sp-pending';
+    pill.textContent = 'En attente de réponse';
+  }
+}
+
+/* --- Actions: accept / counter / decline --- */
+function acceptOffer(){
+  document.getElementById('mainOffer').classList.add('hidden');
+  document.getElementById('resultAccepted').classList.remove('hidden');
+  const pill = document.getElementById('statusPill');
+  pill.className = 'status-pill sp-accepted';
+  pill.textContent = 'Acceptée';
+}
+function sendCounter(){
+  document.getElementById('mainOffer').classList.add('hidden');
+  document.getElementById('resultCountered').classList.remove('hidden');
+}
+function openDecline(){
+  document.getElementById('declineModal').classList.add('active');
+}
+function closeDecline(){
+  document.getElementById('declineModal').classList.remove('active');
+}
+function confirmDecline(){
+  const reason = document.getElementById('declineReason').value.trim();
+  document.getElementById('declineSummary').textContent = reason
+    ? 'Motif transmis : « '+reason+' »'
+    : 'TechCorp SAS a été informé de votre décision.';
+  closeDecline();
+  document.getElementById('mainOffer').classList.add('hidden');
+  document.getElementById('resultDeclined').classList.remove('hidden');
+  const pill = document.getElementById('statusPill');
+  pill.className = 'status-pill sp-declined';
+  pill.textContent = 'Déclinée';
+}
+function resetAll(){
+  document.getElementById('resultAccepted').classList.add('hidden');
+  document.getElementById('resultCountered').classList.add('hidden');
+  document.getElementById('resultDeclined').classList.add('hidden');
+  document.getElementById('mainOffer').classList.remove('hidden');
+  updateStatusPill();
+}
+
+renderMilestones();
+</script>
+</body>
+</html>

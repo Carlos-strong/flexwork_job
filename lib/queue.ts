@@ -32,6 +32,10 @@ export type JobType =
   | "MISSION_UPDATED"
   | "APPLICATION_SUBMITTED"
   | "APPLICATION_ACCEPTED"
+  | "APPLICATION_SHORTLISTED"
+  | "APPLICATION_REJECTED"
+  | "OFFER_SENT"
+  | "OFFER_ACCEPTED"
   | "CONTRACT_CREATED"
   | "CONTRACT_ESCROW_CREATED"
   | "CONTRACT_COMPLETED"
@@ -44,7 +48,8 @@ export type JobType =
   | "MILESTONE_COMPLETED"
   | "WEBHOOK_STRIPE"
   | "WEBHOOK_TRUSTENGINE"
-  | "NOTIFICATION_EMAIL";
+  | "NOTIFICATION_EMAIL"
+  | "APPLICATION_VIEWED";
 
 export type JobDataMap = {
   MISSION_CREATED: { missionId: string; title: string; clientId: string; skills: string[]; budget: number };
@@ -59,6 +64,20 @@ export type JobDataMap = {
   MISSION_UPDATED: { missionId: string; title: string; changes: string[] };
   APPLICATION_SUBMITTED: { applicationId: string; missionId: string; freelancerId: string; freelancerName: string; proposedBudget: number };
   APPLICATION_ACCEPTED: { applicationId: string; missionId: string; missionTitle: string; freelancerId: string; freelancerName: string };
+  APPLICATION_SHORTLISTED: { applicationId: string };
+  APPLICATION_REJECTED: { applicationId: string; reason?: string };
+  APPLICATION_VIEWED: {
+    applicationId: string;
+    missionId: string;
+    missionTitle: string;
+    freelancerId: string;
+    freelancerUserId: string;
+    freelancerName: string;
+    freelancerEmail: string;
+    clientName: string;
+  };
+  OFFER_SENT: { applicationId: string };
+  OFFER_ACCEPTED: { applicationId: string };
   CONTRACT_CREATED: { contractId: string; missionId: string; missionTitle: string; clientId: string; freelancerId: string; escrowAmount: number };
   CONTRACT_ESCROW_CREATED: { contractId: string; escrowId: string; missionTitle: string; amount: number; clientId: string; freelancerId: string };
   CONTRACT_COMPLETED: { contractId: string; missionTitle: string; totalAmount: number };
@@ -87,7 +106,8 @@ let redisClient: Redis | null = null;
 export function getRedisClient(): Redis {
   if (!redisClient) {
     redisClient = new Redis(REDIS_URL, {
-      maxRetriesPerRequest: 3,
+      // BullMQ (Worker) exige maxRetriesPerRequest: null sur la connexion partagée
+      maxRetriesPerRequest: null,
       enableReadyCheck: false,
       lazyConnect: true,
       retryStrategy: (times) => Math.min(times * 100, 2000),
@@ -122,6 +142,11 @@ const jobQueueMap: Record<JobType, QueueName> = {
   MISSION_UPDATED: "missions",
   APPLICATION_SUBMITTED: "applications",
   APPLICATION_ACCEPTED: "applications",
+  APPLICATION_SHORTLISTED: "applications",
+  APPLICATION_REJECTED: "applications",
+  APPLICATION_VIEWED: "applications",
+  OFFER_SENT: "applications",
+  OFFER_ACCEPTED: "applications",
   CONTRACT_CREATED: "contracts",
   CONTRACT_ESCROW_CREATED: "contracts",
   CONTRACT_COMPLETED: "contracts",

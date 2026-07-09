@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * POST /api/prestataires/demandes/accept
  * Accepter une demande de service (prestataire)

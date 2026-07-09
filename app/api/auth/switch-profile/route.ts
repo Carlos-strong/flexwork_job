@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * POST /api/auth/switch-profile
  * Permet à un utilisateur de basculer entre ses profils (freelance ↔ client)

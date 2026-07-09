@@ -70,7 +70,6 @@ export async function PUT(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const { id } = await request.json();
-    console.log("Attempting to delete user with ID:", id);
 
     // Vérifier si l'utilisateur existe
     const user = await prisma.user.findUnique({
@@ -81,10 +80,8 @@ export async function DELETE(request: Request) {
       },
     });
     if (!user) {
-      console.log("User not found");
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
-    console.log("User found:", user);
 
     // Étape 1 : Supprimer les comptes et sessions (ont onDelete: Cascade côté Prisma)
     await prisma.account.deleteMany({ where: { userId: id } });

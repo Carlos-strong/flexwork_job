@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { verificationIdentiteSchema } from "@/lib/validations/auth";
 import { PieceType } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * GET /api/prestataire/verification
  * Retourne le statut KYC de l'utilisateur connecté.
@@ -82,8 +85,6 @@ export async function POST(req: Request) {
       console.warn("[VERIFICATION] Pas d'authentification");
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
-
-    console.log("[VERIFICATION] Début vérification pour userId:", userId);
 
     const pieceTypeRaw = formData.get("pieceType") as string;
     const numeroPiece = formData.get("numeroPiece") as string;

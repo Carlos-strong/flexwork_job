@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { TimeTracker, FileUploader } from "@/lib/dynamic-imports";
 import { ChatBox } from "@/components/chat/chat-box";
@@ -43,6 +43,7 @@ export default function WorkRoomPage() {
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [declining, setDeclining] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -69,6 +70,48 @@ export default function WorkRoomPage() {
       setPayments(Array.isArray(ps) ? ps : (ps.data ?? []));
     };
     load();
+  }, [params.id]);
+
+  // SSE — synchronisation temps réel des états contrat/milestone
+  useEffect(() => {
+    const contractId = params.id as string;
+    if (!contractId) return;
+
+    const connect = () => {
+      const es = new EventSource(`/api/sse?room=${encodeURIComponent(contractId)}`);
+      esRef.current = es;
+
+      es.onmessage = (e) => {
+        try {
+          const event = JSON.parse(e.data);
+          if (event.type === "contract_update") {
+            setContract((prev) => prev ? { ...prev, status: event.data.status as string } : prev);
+          }
+          if (event.type === "milestone_update") {
+            setMilestones((prev) =>
+              prev.map((m) =>
+                m.id === event.data.milestoneId
+                  ? { ...m, status: event.data.status as string }
+                  : m
+              )
+            );
+          }
+        } catch { /* ignore */ }
+      };
+
+      es.onerror = () => {
+        es.close();
+        esRef.current = null;
+        setTimeout(connect, 3000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      esRef.current?.close();
+      esRef.current = null;
+    };
   }, [params.id]);
 
   const handleDeclineContract = async () => {
@@ -211,6 +254,7 @@ export default function WorkRoomPage() {
           currentUserId={currentUser?.id || "guest"}
           currentUserName={currentUser?.name || "Freelancer"}
           otherPartyName={contract.clientName}
+          otherPartyId={contract.clientId || ""}
         />
       )}
 

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { contracts } from "@/lib/mock-data";
-import { applications } from "@/lib/mock-data";
+import { contracts, applications, persistMockStore } from "@/lib/mock-data";
 import { conversations, addSystemMessage } from "@/lib/collaboration";
 import { enqueueJob } from "@/lib/queue";
+import { syncStore } from "@/lib/sync-store";
 
 export async function PUT(
   req: Request,
@@ -39,7 +39,7 @@ export async function PUT(
       try {
         await prisma.contract.update({ where: { id: params.id }, data: { status: "DISPUTED" } });
       } catch {
-        if (mockContract) mockContract.status = "DECLINED";
+        if (mockContract) { mockContract.status = "DECLINED"; persistMockStore(); }
       }
 
       const conv = conversations.find((c) => c.contractId === params.id);
@@ -47,7 +47,7 @@ export async function PUT(
 
       // Mettre à jour la candidature associée (mock fallback)
       const appIndex = applications.findIndex((a) => conv?.title.includes(a.freelancerId || ""));
-      if (appIndex !== -1) applications[appIndex].status = "CONTRACT_DECLINED";
+      if (appIndex !== -1) { applications[appIndex].status = "CONTRACT_DECLINED"; persistMockStore(); }
 
       await enqueueJob("NOTIFICATION_EMAIL", {
         to: "client@flexwork.test",
@@ -55,6 +55,8 @@ export async function PUT(
         template: "contract_declined",
         data: { missionTitle },
       }).catch(() => {});
+
+      syncStore.emit(params.id, { type: "contract_update", data: { status: "DECLINED" } });
 
       return NextResponse.json({ message: "Contrat refusé" });
     }
@@ -87,6 +89,11 @@ export async function PUT(
         amount: milestone.amount,
       }).catch(() => {});
 
+      syncStore.emit(params.id, {
+        type: "milestone_update",
+        data: { milestoneId: milestone.id, status: "IN_REVIEW", title: milestone.title },
+      });
+
       return NextResponse.json({ message: "Milestone soumis", milestoneId: milestone.id, status: "IN_REVIEW" });
     }
 
@@ -116,6 +123,11 @@ export async function PUT(
         title: milestone.title,
         amount: milestone.amount,
       }).catch(() => {});
+
+      syncStore.emit(params.id, {
+        type: "milestone_update",
+        data: { milestoneId: milestone.id, status: "APPROVED", title: milestone.title },
+      });
 
       return NextResponse.json({ message: "Milestone approuvé", milestoneId: milestone.id, status: "APPROVED" });
     }
@@ -154,6 +166,11 @@ export async function PUT(
         milestoneTitle: milestone.title,
         amount: milestone.amount,
       }).catch(() => {});
+
+      syncStore.emit(params.id, {
+        type: "milestone_update",
+        data: { milestoneId: milestone.id, status: "RELEASED", title: milestone.title },
+      });
 
       return NextResponse.json({ message: "Paiement libéré", milestoneId: milestone.id, status: "RELEASED" });
     }

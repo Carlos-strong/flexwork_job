@@ -6,18 +6,38 @@ import {
   parseBody,
 } from "@/lib/api-gateway";
 import { enqueueJob } from "@/lib/queue";
-import { milestones } from "@/lib/mock-data";
+import { milestones, persistMockStore } from "@/lib/mock-data";
+import { prisma } from "@/lib/prisma";
+import { syncStore } from "@/lib/sync-store";
 
 interface Milestone {
   id: string; title: string; description: string; amount: number;
   status: string; dueDate: string; completedAt?: string;
 }
 
-// ── GET /api/contracts/[id]/milestones ────────
+// ── GET /api/contracts/[id]/milestones ────────────
 export const GET = createApiHandler({
   methods: ["GET"],
   async handler(_req: NextRequest, ctx: { params: Record<string, string> }) {
-    return apiSuccess(milestones[ctx.params.id] || []);
+    const contractId = ctx.params.id;
+    try {
+      const dbMilestones = await prisma.milestone.findMany({
+        where: { contractId },
+        orderBy: { createdAt: "asc" },
+      });
+      return apiSuccess(dbMilestones.map((m) => ({
+        id: m.id,
+        title: m.title,
+        description: m.description ?? "",
+        amount: m.amount,
+        status: m.status,
+        dueDate: m.dueDate?.toISOString() ?? "",
+        completedAt: m.completedAt?.toISOString(),
+      })));
+    } catch {
+      // DB indisponible — fallback mock
+    }
+    return apiSuccess(milestones[contractId] || []);
   },
 });
 
@@ -41,6 +61,7 @@ export const POST = createApiHandler({
 
     if (!milestones[ctx.params.id]) milestones[ctx.params.id] = [];
     milestones[ctx.params.id].push(milestone);
+    persistMockStore();
 
     await enqueueJob("MILESTONE_SUBMITTED", {
       milestoneId: milestone.id,
@@ -82,6 +103,13 @@ export const PUT = createApiHandler({
       status: body.status,
       completedAt: body.status === "APPROVED" ? new Date().toISOString() : undefined,
     };
+    persistMockStore();
+
+    // Émettre SSE pour synchronisation temps réel
+    syncStore.emit(ctx.params.id, {
+      type: "milestone_update",
+      data: { milestoneId: body.milestoneId, status: body.status, title: list[idx].title },
+    });
 
     if (body.status === "APPROVED") {
       await enqueueJob("PAYMENT_RELEASE", {
@@ -118,3 +146,4 @@ export const PUT = createApiHandler({
     return apiSuccess(list[idx]);
   },
 });
+

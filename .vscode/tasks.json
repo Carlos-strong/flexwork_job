@@ -10,6 +10,54 @@
 			"label": "Prisma Validate",
 			"type": "shell",
 			"command": "npx prisma validate"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
+		},
+		{
+			"label": "TypeScript Check",
+			"type": "shell",
+			"command": "npx tsc --noEmit",
+			"group": "build"
 		}
 	]
 }

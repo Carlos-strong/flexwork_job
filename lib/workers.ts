@@ -10,6 +10,7 @@ import { Worker } from "bullmq";
 import { getConnection, enqueueJob, type QueueName } from "./queue";
 import { sendEmail, EmailTemplates } from "./email";
 import { notifications } from "./notifications";
+import { pushNotification } from "./socket-server-client";
 import { conversations, addSystemMessage } from "./collaboration";
 import { stripeEscrow } from "./escrow/stripe";
 import { contracts } from "./mock-data";
@@ -57,7 +58,31 @@ async function handleApplicationAccepted(data: Record<string, unknown>): Promise
     clientName: "Client",
   });
 }
+async function handleApplicationViewed(data: Record<string, unknown>): Promise<void> {
+  const { applicationId, missionTitle, freelancerUserId, freelancerName, freelancerEmail, clientName } = data as {
+    applicationId: string; missionId: string; missionTitle: string;
+    freelancerId: string; freelancerUserId: string; freelancerName: string; freelancerEmail: string; clientName: string;
+  };
+  console.log(`[Worker] \ud83d\udc40 Candidature consult\u00e9e: ${freelancerName} \u2014 \u00ab ${missionTitle} \u00bb par ${clientName}`);
 
+  // Email de notification au freelancer
+  const tpl = EmailTemplates.applicationViewed({
+    freelancerName,
+    missionTitle,
+    clientName,
+    applicationUrl: `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/dashboard/freelancer/candidatures/${applicationId}`,
+  });
+  await sendEmail({ to: freelancerEmail, ...tpl });
+
+  // Notification temps réel (cloche) au freelancer
+  pushNotification({
+    userId: freelancerUserId,
+    type: "application",
+    title: "Candidature consultée",
+    body: `${clientName} a consulté votre candidature pour « ${missionTitle} ».`,
+    link: `/dashboard/freelancer/candidatures`,
+  });
+}
 async function handleContractCreated(data: Record<string, unknown>): Promise<void> {
   const { missionTitle, escrowAmount, freelancerId } = data as {
     contractId: string; missionTitle: string; escrowAmount: number; freelancerId: string;
@@ -375,6 +400,7 @@ const handlers: Record<string, (data: Record<string, unknown>) => Promise<void>>
   MISSION_UPDATED: handleMissionUpdated,
   APPLICATION_SUBMITTED: handleApplicationSubmitted,
   APPLICATION_ACCEPTED: handleApplicationAccepted,
+  APPLICATION_VIEWED: handleApplicationViewed,
   CONTRACT_CREATED: handleContractCreated,
   CONTRACT_ESCROW_CREATED: handleContractEscrowCreated,
   CONTRACT_COMPLETED: handleContractCompleted,

@@ -85,7 +85,7 @@ export const POST = createApiHandler({
     // Résoudre le profil freelance à partir de l'userId
     const freelancerProfile = await prisma.freelancerProfile.findUnique({
       where: { userId: body.freelancerId },
-      select: { id: true },
+      select: { id: true, isValidated: true },
     });
     if (!freelancerProfile) {
       return apiError("Profil freelance introuvable. Complétez votre inscription.", 404);
@@ -93,22 +93,24 @@ export const POST = createApiHandler({
 
     // ── Règle métier #1 (PRD) : vérifier le statut KYC du freelance ──
     let initialStatus: ApplicationStatus = "SUBMITTED";
-    try {
-      const kyc = await prisma.verificationIdentite.findFirst({
-        where: { userId: body.freelancerId },
-        orderBy: { dateSoumission: "desc" },
-        select: { statut: true },
-      });
-      if (!kyc) {
-        initialStatus = "IDENTITY_PENDING";
-      } else if (kyc.statut === "EN_ATTENTE") {
-        initialStatus = "IDENTITY_PENDING";
+    if (!freelancerProfile.isValidated) {
+      try {
+        const kyc = await prisma.verificationIdentite.findFirst({
+          where: { userId: body.freelancerId },
+          orderBy: { dateSoumission: "desc" },
+          select: { statut: true },
+        });
+        if (!kyc) {
+          initialStatus = "IDENTITY_PENDING";
+        } else if (kyc.statut === "EN_ATTENTE") {
+          initialStatus = "IDENTITY_PENDING";
+        }
+        if (kyc?.statut === "REJETE") {
+          return apiError("Votre vérification d'identité a été rejetée. Veuillez soumettre de nouveaux documents.", 403);
+        }
+      } catch {
+        // Prisma non disponible → on laisse SUBMITTED
       }
-      if (kyc?.statut === "REJETE") {
-        return apiError("Votre vérification d'identité a été rejetée. Veuillez soumettre de nouveaux documents.", 403);
-      }
-    } catch {
-      // Prisma non disponible → on laisse SUBMITTED
     }
 
     // Mapping recruitment.ApplicationStatus → Prisma.ApplicationStatus

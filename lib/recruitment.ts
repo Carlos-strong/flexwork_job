@@ -12,6 +12,10 @@
  *   SELECTED, CONTRACT_PENDING, CONTRACT_ACCEPTED, ESCROW_PENDING, ACTIVE
  */
 
+import { saveToDisk, loadFromDisk } from "@/lib/persist";
+
+const STORAGE_KEY = "recruitment";
+
 // ── Types ──────────────────────────────────────
 
 /** Statuts orientés workflow client */
@@ -45,7 +49,7 @@ export type ApplicationStatus =
 
 /** Transitions autorisées entre statuts */
 export const ALLOWED_TRANSITIONS: Record<string, ApplicationStatus[]> = {
-  SUBMITTED:       ["UNREAD"],
+  SUBMITTED:       ["UNREAD", "READ"],   // PENDING (deprecated) → READ ou UNREAD
   UNREAD:          ["READ"],
   READ:            ["SHORTLISTED", "REJECTED", "ARCHIVED"],
   SHORTLISTED:     ["DISCUSSION", "REJECTED"],
@@ -57,7 +61,7 @@ export const ALLOWED_TRANSITIONS: Record<string, ApplicationStatus[]> = {
   ARCHIVED:        ["READ"],        // Possibilité de désarchiver
   REJECTED:        [],              // Terminal
   WITHDRAWN:       [],              // Terminal
-  IDENTITY_PENDING: ["UNREAD"],     // Après validation KYC
+  IDENTITY_PENDING: ["UNREAD", "READ"], // Après validation KYC (READ si déjà validé entre-temps)
   UNDER_REVIEW:    ["SHORTLISTED", "REJECTED"],
   INTERVIEW_PENDING: ["INTERVIEW_COMPLETED", "REJECTED"],
   INTERVIEW_COMPLETED: ["SELECTED", "REJECTED"],
@@ -184,23 +188,61 @@ export const REJECTION_REASONS = [
   "Autre",
 ] as const;
 
-// ── Stores mock ────────────────────────────────
+// ── Stores persistants (mémoire + fichier) ─────
 
-export const applicationAudits: ApplicationAudit[] = [];
-export const candidateInterviews: CandidateInterview[] = [];
-export const contractOffers: ContractOffer[] = [];
+interface RecruitmentStore {
+  applicationAudits: ApplicationAudit[];
+  candidateInterviews: CandidateInterview[];
+  contractOffers: ContractOffer[];
+  auditCounter: number;
+  interviewCounter: number;
+  offerCounter: number;
+}
 
-let auditCounter = 1;
+declare global {
+  // eslint-disable-next-line no-var
+  var __recruitmentStore: RecruitmentStore | undefined;
+}
+
+function loadStore(): RecruitmentStore {
+  if (globalThis.__recruitmentStore) return globalThis.__recruitmentStore;
+
+  const saved = loadFromDisk<RecruitmentStore | null>(STORAGE_KEY, null);
+  if (saved) {
+    globalThis.__recruitmentStore = saved;
+    return saved;
+  }
+
+  const defaults: RecruitmentStore = {
+    applicationAudits: [],
+    candidateInterviews: [],
+    contractOffers: [],
+    auditCounter: 1,
+    interviewCounter: 1,
+    offerCounter: 1,
+  };
+  globalThis.__recruitmentStore = defaults;
+  return defaults;
+}
+
+const _rStore = loadStore();
+
+export const applicationAudits  = _rStore.applicationAudits;
+export const candidateInterviews = _rStore.candidateInterviews;
+export const contractOffers      = _rStore.contractOffers;
+
+function persistRecruitment(): void {
+  saveToDisk(STORAGE_KEY, _rStore);
+}
+
 function aid(): string {
-  return `audit-${Date.now()}-${auditCounter++}`;
+  return `audit-${Date.now()}-${_rStore.auditCounter++}`;
 }
-let interviewCounter = 1;
 function iid(): string {
-  return `int-${Date.now()}-${interviewCounter++}`;
+  return `int-${Date.now()}-${_rStore.interviewCounter++}`;
 }
-let offerCounter = 1;
 function oid(): string {
-  return `offer-${Date.now()}-${offerCounter++}`;
+  return `offer-${Date.now()}-${_rStore.offerCounter++}`;
 }
 
 // ── Helpers ────────────────────────────────────
@@ -225,6 +267,7 @@ export function logApplicationAudit(params: {
     createdAt: new Date().toISOString(),
   };
   applicationAudits.push(entry);
+  persistRecruitment();
   return entry;
 }
 
@@ -245,6 +288,7 @@ export function scheduleInterview(params: {
     createdAt: new Date().toISOString(),
   };
   candidateInterviews.push(interview);
+  persistRecruitment();
   return interview;
 }
 
@@ -254,6 +298,7 @@ export function completeInterview(interviewId: string, notes?: string): void {
   if (interview) {
     interview.status = "completed";
     if (notes) interview.notes = notes;
+    persistRecruitment();
   }
 }
 
@@ -283,6 +328,7 @@ export function createOffer(params: {
     createdAt: new Date().toISOString(),
   };
   contractOffers.push(offer);
+  persistRecruitment();
   return offer;
 }
 
@@ -295,5 +341,6 @@ export function acceptOffer(offerId: string): void {
     contractOffers
       .filter((o) => o.applicationId === offer.applicationId && o.id !== offerId)
       .forEach((o) => { o.status = "rejected"; });
+    persistRecruitment();
   }
 }

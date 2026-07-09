@@ -18,6 +18,9 @@
 
 # large data files
 json-cities.json
+
+# persist — données de développement (mémoire → fichier)
+/.data/
 json-cities.json.gz
 
 # misc

@@ -4,8 +4,7 @@ import { LogoutButton } from "@/components/layout/logout-button";
 const adminNav = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
   { href: "/admin/utilisateurs", label: "Utilisateurs", icon: "👥" },
-  { href: "/admin/verifications/freelances", label: "Vérif. Freelances", icon: "🪪" },
-  { href: "/admin/verifications/companies", label: "Vérif. Entreprises", icon: "🏢" },
+  { href: "/admin/kyc", label: "KYC et Vérifications", icon: "🪪" },
   { href: "/admin/missions", label: "Missions", icon: "📋" },
   { href: "/admin/disputes", label: "Litiges", icon: "⚖️" },
   { href: "/admin/paiements", label: "Paiements", icon: "💳" },

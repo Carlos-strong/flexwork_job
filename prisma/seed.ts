@@ -584,6 +584,7 @@ async function main() {
     data: {
       missionId: mission4.id,
       freelancerId: freelancer2.id,
+      startDate: new Date("2026-06-01"),
       status: "ACTIVE",
       escrowAmount: 6000,
       escrowId: "escrow_demo_001",

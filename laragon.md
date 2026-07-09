@@ -60,13 +60,21 @@ Dans le terminal Laragon :
 ```bash
 cd C:\Users\benca\Documents\Projets\Flexwork_job
 
-# 1. Lancer les services externes (si besoin)
-docker compose up -d    # Redis + Mailpit uniquement
+# 1. Lancer les services externes (Redis + Mailpit via Docker)
+docker compose up -d
 
-# 2. Lancer le serveur Next.js
+# 2. (Optionnel) Serveur TURN/STUN pour WebRTC
+#    - Si Docker est disponible : docker compose --profile turn up -d coturn
+#    - Sinon : pas de TURN — le fallback STUN Google suffit en local
+npm run turn
+
+# 3. Lancer le serveur Next.js
 npm run dev
 
-# 3. (Optionnel) Workers BullMQ
+# 4. (Optionnel) WebSocket pour messagerie temps réel
+npm run ws
+
+# 5. (Optionnel) Workers BullMQ
 npm run workers
 ```
 

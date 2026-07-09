@@ -51,6 +51,8 @@ describe("POST /api/auth/register (intégration mock)", () => {
       email: "jean@example.com",
       password: "12345678",
       confirmPassword: "12345678",
+      cguAccepted: true,
+      role: "client",
     };
 
     const req = new Request("http://localhost/api/auth/register", {
@@ -79,6 +81,8 @@ describe("POST /api/auth/register (intégration mock)", () => {
       email: "new@example.com",
       password: "12345678",
       confirmPassword: "12345678",
+      cguAccepted: true,
+      role: "client",
     };
 
     const req = new Request("http://localhost/api/auth/register", {
@@ -93,8 +97,8 @@ describe("POST /api/auth/register (intégration mock)", () => {
     expect(json.error).toBeDefined();
   });
 
-  it("retourne 201 (anti-énumération) si l'email existe déjà", async () => {
-    // Simuler email existant
+  it("retourne 409 si l'email existe déjà", async () => {
+    // Simuler email existant (phone inconnu, email existant)
     mockFindUnique.mockImplementation(({ where }: any) => {
       if (where && where.email) return Promise.resolve({ id: "u-email" });
       return Promise.resolve(null);
@@ -107,6 +111,8 @@ describe("POST /api/auth/register (intégration mock)", () => {
       email: "exist@example.com",
       password: "12345678",
       confirmPassword: "12345678",
+      cguAccepted: true,
+      role: "client",
     };
 
     const req = new Request("http://localhost/api/auth/register", {
@@ -117,7 +123,7 @@ describe("POST /api/auth/register (intégration mock)", () => {
 
     const res = await POST(req as any);
     const json = await res.json();
-    expect(res.status).toBe(201);
-    expect(json.message).toBeDefined();
+    expect(res.status).toBe(409);
+    expect(json.error).toBeDefined();
   });
 });

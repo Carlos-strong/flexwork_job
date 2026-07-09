@@ -103,7 +103,7 @@ export default function ApplyMissionPage() {
         </div>
         <p className="mt-3 text-sm text-[#5A5750]">{mission.description}</p>
         <div className="mt-3 flex items-center gap-4 text-sm">
-          <span className="font-semibold text-[#2D5BE3]">{mission.budget.toLocaleString()} €</span>
+          <span className="font-semibold text-[#2D5BE3]">{mission.budget?.toLocaleString() ?? 'N/A'} €</span>
           <span className="text-[#5A5750]">{mission.duration}</span>
           <span className="text-[#5A5750]">{mission.location}</span>
         </div>

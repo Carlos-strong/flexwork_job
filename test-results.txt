@@ -1,0 +1,9 @@
+﻿
+ RUN  v4.1.9 C:/Users/benca/Documents/Projets/Flexwork_job
+
+
+ Test Files  13 passed (13)
+      Tests  174 passed (174)
+   Start at  18:54:47
+   Duration  25.98s (transform 5.27s, setup 11.61s, import 13.00s, tests 4.51s, environment 106.22s)
+

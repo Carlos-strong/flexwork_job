@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { authOptions } from "@/lib/auth";
 import { enqueueJob } from "@/lib/queue";
 
+export const dynamic = "force-dynamic";
+
+
 /**
  * GET /api/admin/validation-utilisateurs
  * Récupérer les prestataires en attente de validation
@@ -14,8 +17,9 @@ export async function GET(req: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
-
-    // TODO: Vérifier que l'utilisateur est admin
+    if (session.user.activeProfile !== "ADMIN") {
+      return NextResponse.json({ error: "Accès réservé aux administrateurs" }, { status: 403 });
+    }
 
     const prestataires = await prisma.prestataireMetier.findMany({
       where: {
@@ -59,8 +63,9 @@ export async function PUT(req: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
-
-    // TODO: Vérifier que l'utilisateur est admin
+    if (session.user.activeProfile !== "ADMIN") {
+      return NextResponse.json({ error: "Accès réservé aux administrateurs" }, { status: 403 });
+    }
 
     const body = await req.json();
     const { prestataireMetierId, statut, motifRejet } = body;

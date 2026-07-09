@@ -25,6 +25,7 @@ describe("Phase A — Création du Compte (final.md)", () => {
       email: "jean@example.com",
       password: "monMot2passe",
       confirmPassword: "monMot2passe",
+      cguAccepted: true,
     });
     expect(r.success).toBe(true);
   });
@@ -37,6 +38,7 @@ describe("Phase A — Création du Compte (final.md)", () => {
       email: "jean@example.com",
       password: "12345678",
       confirmPassword: "87654321",
+      cguAccepted: true,
     });
     expect(r.success).toBe(false);
     if (!r.success) {
@@ -525,12 +527,18 @@ describe("Règles transverses (final.md)", () => {
   });
 
   // final.md: "CGU acceptées une seule fois"
-  it("R26 — CGU : implicite à la création du compte (pas de champ dédié dans le schéma)", () => {
-    // Dans registerStep1Schema, les CGU sont implicites (pas de checkbox dans le schéma)
-    // car l'UI les affiche et leur acceptation est requise avant soumission
+  it("R26 — CGU : champ obligatoire dans le schéma d'inscription", () => {
+    // Dans registerStep1Schema, cguAccepted est un champ requis
+    // L'utilisateur doit explicitement accepter les CGU (true) pour s'inscrire
     const keys = Object.keys(registerStep1Schema.shape);
-    // On vérifie qu'il n'y a pas de champ CGU dans le schéma (géré côté UI/contrat)
-    expect(keys).not.toContain("cguAccepted");
+    expect(keys).toContain("cguAccepted");
+    // Vérifier que false est rejeté
+    const r = registerStep1Schema.safeParse({
+      firstName: "A", lastName: "B", phone: "+237612345678",
+      email: "a@b.com", password: "12345678", confirmPassword: "12345678",
+      cguAccepted: false,
+    });
+    expect(r.success).toBe(false);
   });
 
   // final.md: "Séparation Identité / Activité"

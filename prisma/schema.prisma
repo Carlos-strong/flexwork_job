@@ -131,6 +131,37 @@ enum PaymentStatus {
   REFUNDED
 }
 
+/// Type d'offre (Fixe ou Horaire)
+enum OfferType {
+  FIXED     // Montant fixe + Jalons
+  HOURLY    // Taux horaire + Limite hebdo
+}
+
+/// Type de contrat (Fixe ou Horaire)
+enum ContractType {
+  FIXED     // Montant fixe
+  HOURLY    // Taux horaire
+}
+
+/// Statut d'une offre
+enum OfferStatus {
+  DRAFT         // Brouillon (non envoyée)
+  SENT          // Envoyée au freelance
+  COUNTERED     // Contre-proposition envoyée par le freelance — en attente de décision client
+  ACCEPTED      // Acceptée → contrat créé
+  DECLINED      // Refusée
+  EXPIRED       // Expirée (pas de réponse)
+  WITHDRAWN     // Retirée par le client
+}
+
+/// Type de format d'entretien
+enum InterviewFormat {
+  CHAT          // Discussion texte
+  VIDEO_CALL    // Appel vidéo
+  PHONE         // Appel téléphonique
+  MEETING       // Réunion programmée
+}
+
 // ========== MODELS ==========
 
 /// Compte unique — un utilisateur possède un seul compte.
@@ -628,23 +659,149 @@ model Application {
   freelancer      FreelancerProfile @relation(fields: [freelancerId], references: [id])
   missionId       String
   mission         Mission           @relation(fields: [missionId], references: [id])
+  
+  // Candidature
   coverLetter     String?           @db.Text
   proposedBudget  Float?
+  proposedDays    Int?              // Durée proposition en jours
+  
+  // Statut
   status          ApplicationStatus @default(PENDING)
   message         String?           @db.Text
+  
+  // Relations workflow
+  interview       Interview?
+  offers          Offer[]
+  statusHistory   ApplicationStatusHistory[]
+  
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   @@unique([freelancerId, missionId])
+  @@index([status, missionId])
+  @@index([freelancerId, status])
   @@map("applications")
+}
+
+/// Entretien/Interview entre client et freelance
+model Interview {
+  id                String   @id @default(cuid())
+  applicationId     String   @unique
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Planification
+  scheduledAt       DateTime?
+  duration          Int?      // en minutes
+  format            InterviewFormat @default(CHAT)
+  notes             String?   @db.Text
+  
+  // Résultat
+  completedAt       DateTime?
+  feedbackByClient  String?   @db.Text
+  feedbackByFreelancer String? @db.Text
+  rating            Int?      // Note de 1 à 5
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([applicationId])
+  @@index([scheduledAt])
+  @@map("interviews")
+}
+
+/// Offre formelle de mission au freelance
+model Offer {
+  id                String      @id @default(cuid())
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  // Basique
+  title             String
+  description       String?     @db.Text
+  offerType         OfferType   @default(FIXED)
+  
+  // FIXED: Montant + Jalons
+  totalBudget       Float?      // Montant total (si FIXED)
+  
+  // HOURLY: Taux + Limite
+  hourlyRate        Float?      // Taux horaire (si HOURLY)
+  weeklyHourLimit   Int?        // Limite hebdomadaire (ex: 40h)
+  
+  // Dates
+  startDate         DateTime
+  endDate           DateTime?   // Null si durée indéfinie
+  
+  // Statut & Timing
+  status            OfferStatus @default(DRAFT)
+  sentAt            DateTime?
+  expiresAt         DateTime?   // Expiration si pas acceptée (ex: 7 jours)
+  acceptedAt        DateTime?
+  declinedAt        DateTime?
+  declineReason     String?
+
+  // Contre-proposition (négociation client ↔ freelance)
+  counteredAt       DateTime?   // Date d'envoi de la dernière contre-proposition
+  counterNote       String?     @db.Text // Message accompagnant la dernière contre-proposition
+  negotiationRounds Int         @default(0) // Nombre de contre-propositions échangées (max MAX_NEGOTIATION_ROUNDS = 3)
+  lastCounterBy     String?     // "CLIENT" | "FREELANCER" — auteur de la dernière contre-proposition
+  
+  // Audit
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  contract          Contract?   @relation("OfferContract")
+  milestones        Milestone[]
+  
+  @@index([applicationId, status])
+  @@index([status, expiresAt])
+  @@map("offers")
+}
+
+/// Historique des transitions de statut des applications
+model ApplicationStatusHistory {
+  id              String            @id @default(cuid())
+  applicationId   String
+  application     Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  fromStatus      ApplicationStatus
+  toStatus        ApplicationStatus
+  changedBy       String            // ID user (client/freelancer/admin)
+  changedByRole   String            // "CLIENT", "FREELANCER", "ADMIN"
+  reason          String?           // Motif si rejeté/archivé
+  
+  createdAt       DateTime          @default(now())
+  
+  @@index([applicationId, createdAt])
+  @@index([applicationId])
+  @@map("application_status_history")
 }
 
 model Contract {
   id            String         @id @default(cuid())
+  offerId       String?        @unique
+  offer         Offer?         @relation("OfferContract", fields: [offerId], references: [id])
+  
   missionId     String         @unique
   mission       Mission        @relation(fields: [missionId], references: [id])
   freelancerId  String
   freelancer    FreelancerProfile @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  
+  // Type et Budget
+  contractType  ContractType   @default(FIXED)
+  
+  // FIXED: Montant total
+  totalBudget   Float?
+  
+  // HOURLY: Taux horaire et limite hebdomadaire
+  hourlyRate    Float?
+  weeklyHourLimit Int?
+  
+  // Dates
+  startDate     DateTime
+  endDate       DateTime?
+  
+  // Statut
   status        ContractStatus @default(PENDING)
 
   // Escrow TrustEngine
@@ -657,21 +814,37 @@ model Contract {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
+  @@index([status, createdAt])
+  @@index([freelancerId])
   @@map("contracts")
 }
 
 model Milestone {
   id          String          @id @default(cuid())
-  contractId  String
-  contract    Contract        @relation(fields: [contractId], references: [id])
+  
+  // Lié à une offre et/ou un contrat
+  offerId     String?
+  offer       Offer?          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  
+  contractId  String?
+  contract    Contract?       @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  
   title       String
   description String?         @db.Text
   amount      Float
+  executionRate Float?        @default(100) // Taux d'exécution attendu pour ce jalon (0-100)
   status      MilestoneStatus @default(PENDING)
   dueDate     DateTime?
   completedAt DateTime?
   createdAt   DateTime        @default(now())
 
+  // Contre-proposition (freelance) — valeurs originales du client, préservées
+  // lorsque le freelance modifie amount/dueDate via une contre-proposition
+  originalAmount  Float?
+  originalDueDate DateTime?
+
+  @@index([offerId])
+  @@index([contractId])
   @@map("milestones")
 }
 

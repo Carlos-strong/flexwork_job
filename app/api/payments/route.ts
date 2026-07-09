@@ -9,7 +9,7 @@ import {
   getPaginationParams,
 } from "@/lib/api-gateway";
 import { enqueueJob } from "@/lib/queue";
-import { payments } from "@/lib/mock-data";
+import { payments, persistMockStore } from "@/lib/mock-data";
 import { prisma } from "@/lib/prisma";
 import { virtualCardService, isVirtualCardEnabled } from "@/lib/payments";
 import type { ApiContext } from "@/lib/api-gateway";
@@ -127,6 +127,7 @@ export const POST = createApiHandler({
       createdAt: new Date().toISOString(),
     };
     payments.push(payment);
+    persistMockStore();
 
     // Sauvegarder en base pour synchronisation
     const payerUserId = body.type === "PAYOUT" ? body.freelancerId : body.clientId;

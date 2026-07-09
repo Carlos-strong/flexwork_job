@@ -35,7 +35,7 @@ async function getClientMissions() {
     workflowStep: m.status,
     applicationsCount: m._count.applications,
     duration: m.duration ?? "",
-    expiresAt: m.expiresAt,
+    expiresAt: m.expiresAt?.toISOString() ?? null,
   }));
 }
 

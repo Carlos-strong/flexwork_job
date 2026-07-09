@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 
 interface Contract {
@@ -17,21 +20,44 @@ const STATUS: Record<string, { label: string; color: string }> = {
   DISPUTED:  { label: "Litige",       color: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
 };
 
-async function getContracts(): Promise<Contract[]> {
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/contracts`, { next: { revalidate: 30 } });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return Array.isArray(json) ? json : (json.data ?? []);
-  } catch { return []; }
-}
+export default function FreelancerContratsPage() {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function FreelancerContratsPage() {
-  const contracts = await getContracts();
+  const loadContracts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contracts");
+      if (!res.ok) return;
+      const json = await res.json();
+      setContracts(Array.isArray(json) ? json : (json.data ?? []));
+    } catch {
+      // silencieux
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadContracts();
+    // Polling 10 s pour synchroniser l'état avec le client et l'admin
+    const interval = setInterval(loadContracts, 10_000);
+    return () => clearInterval(interval);
+  }, [loadContracts]);
 
   const active = contracts.filter((c) => c.status === "ACTIVE");
   const pending = contracts.filter((c) => c.status === "PENDING");
   const completed = contracts.filter((c) => c.status === "COMPLETED");
+
+  if (loading) {
+    return (
+      <div className="space-y-4 animate-pulse">
+        <div className="h-8 bg-[#F5F5F0] rounded-xl w-48" />
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-[#F5F5F0] rounded-xl" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

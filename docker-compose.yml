@@ -41,6 +41,27 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: "true"
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
 
+  # === Serveur TURN/STUN (coturn) pour WebRTC NAT traversal ===
+  # Alternative Laragon : voir scripts/turn-server.js (Node.js natif)
+  coturn:
+    image: coturn/coturn
+    container_name: flexwork-coturn
+    network_mode: host
+    restart: unless-stopped
+    profiles:
+      - turn        # docker compose --profile turn up -d coturn
+    command:
+      - -n
+      - --log-file=stdout
+      - --lt-cred-mech
+      - --realm=localhost
+      - --user=flexwork:flexwork123
+      - --min-port=49152
+      - --max-port=65535
+      - --fingerprint
+      - --no-tls
+      - --no-dtls
+
 volumes:
   postgres_data:
   redis_data:

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 // ── Types ──
 
@@ -60,10 +61,6 @@ const initialState: RegistrationState = {
 };
 
 // ── Helpers ──
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
-}
 
 function Input({ label, id, type = "text", value, onChange, required, placeholder, minLength, error }: {
   label: string; id: string; type?: string; value: string;
