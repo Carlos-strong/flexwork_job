@@ -162,6 +162,85 @@ enum InterviewFormat {
   MEETING       // Réunion programmée
 }
 
+/// Statut d'un certificat numérique
+enum CertificateStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+// ═══════════════════════════════════════════════
+// SIGNATURE NUMÉRIQUE — Certificats & Signatures
+// ═══════════════════════════════════════════════
+
+/// Certificat numérique RSA d'un utilisateur — contient sa clé publique.
+/// Chaque utilisateur peut avoir un seul certificat actif.
+/// La clé privée est chiffrée et stockée côté serveur (ne peut pas être exportée).
+model DigitalCertificate {
+  id                String            @id @default(cuid())
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Métadonnées du certificat
+  commonName        String            // Nom complet de l'utilisateur
+  email             String            // Email de l'utilisateur
+  organization      String?           // Organisation (ex: nom de l'entreprise)
+  validFrom         DateTime          @default(now())
+  validUntil        DateTime          // Date d'expiration du certificat (1 an)
+  status            CertificateStatus @default(ACTIVE)
+  revokedAt         DateTime?
+  revokeReason      String?
+
+  // Clés RSA
+  publicKey         String            @db.Text // Clé publique en PEM
+  encryptedPrivateKey String          @db.Text // Clé privée chiffrée (AES-256-GCM avec une clé dérivée du mot de passe)
+  keyFingerprint    String            @unique // Empreinte SHA-256 de la clé publique
+
+  // Informations de dérivation de la clé de chiffrement
+  keySalt           String            // Sel pour la dérivation PBKDF2
+  keyIv             String            // IV pour AES-256-GCM
+  keyAuthTag        String            // Tag d'authentification AES-GCM
+
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  signatures        ContractSignature[]
+  contractSignedAsFreelancer Contract[] @relation("FreelancerSignature")
+
+  @@index([userId, status])
+  @@index([keyFingerprint])
+  @@map("digital_certificates")
+}
+
+/// Signature numérique apposée sur un contrat.
+/// Un contrat peut être signé par le client ET le freelance (double signature).
+model ContractSignature {
+  id              String            @id @default(cuid())
+  contractId      String
+  contract        Contract          @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  certificateId   String
+  certificate     DigitalCertificate @relation(fields: [certificateId], references: [id])
+
+  // Données signées
+  signedDataHash  String            // Hash SHA-256 du contenu du contrat
+  signature       String            @db.Text // Signature RSA (base64)
+  signingMethod   String            @default("RSA-SHA256")
+
+  // Horodatage
+  signedAt        DateTime          @default(now())
+  verifiedAt      DateTime?         // Dernière vérification réussie
+  verifiedBy      String?           // ID de l'admin qui a vérifié (optionnel)
+
+  // IP / User-Agent (trace)
+  signerIp        String?
+  signerUserAgent String?
+
+  @@unique([contractId, certificateId])
+  @@index([certificateId])
+  @@index([signedDataHash])
+  @@map("contract_signatures")
+}
+
 // ========== MODELS ==========
 
 /// Compte unique — un utilisateur possède un seul compte.
@@ -219,6 +298,9 @@ model User {
 
   // Relations nouvelles — cartes virtuelles de test
   virtualCards     VirtualCard[]
+
+  // Relations — signature numérique
+  digitalCertificates DigitalCertificate[]
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -807,6 +889,14 @@ model Contract {
   // Escrow TrustEngine
   escrowAmount  Float?
   escrowId      String?
+
+  // Signature numérique
+  signatures    ContractSignature[]
+  signedByCertificateId String?                // Certificat du signataire (cliente)
+  signedByCertificate   DigitalCertificate?    @relation("FreelancerSignature", fields: [signedByCertificateId], references: [id])
+  clientSignedAt DateTime?                     // Date de signature par le client
+  freelancerSignedAt DateTime?                 // Date de signature par le freelance
+  fullySignedAt  DateTime?                     // Date des deux signatures (contrat juridiquement valide)
 
   milestones    Milestone[]
   messages      Message[]
