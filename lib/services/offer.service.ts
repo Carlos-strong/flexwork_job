@@ -323,7 +323,7 @@ export class OfferService {
         type: "OFFER_ACCEPTED",
         title: "Offre acceptée",
         message: `${freelanceUser.firstName} a accepté votre offre`,
-        data: { contractId: result.contract.id },
+        data: { offerId: offer.id, applicationId: offer.applicationId, contractId: result.contract.id },
       });
     }
 
@@ -468,6 +468,15 @@ export class OfferService {
         changedByRole: "FREELANCER",
         reason: reason,
       },
+    });
+
+    // Notifier le client que l'offre a été refusée
+    await sendNotification({
+      userId: "", // sera résolu via offerId dans le helper
+      type: "OFFER_DECLINED",
+      title: "Offre refusée",
+      message: "Le freelance a refusé l'offre",
+      data: { offerId: updatedOffer.id, applicationId: updatedOffer.applicationId, reason },
     });
 
     return updatedOffer;
@@ -639,6 +648,9 @@ export class OfferService {
         data: {
           offerId: updatedOffer.id,
           applicationId: updatedOffer.applicationId,
+          counteredBy: actorRole,
+          remainingRounds,
+          note,
         },
       });
     }
@@ -691,12 +703,23 @@ export class OfferService {
       throw new Error(`Cannot withdraw offer with status ${offer.status}`);
     }
 
-    return await prisma.offer.update({
+    const updated = await prisma.offer.update({
       where: { id: offerId },
       data: {
         status: "WITHDRAWN",
         declineReason: reason,
       },
     });
+
+    // Notifier le freelance que l'offre a été retirée
+    await sendNotification({
+      userId: "",
+      type: "OFFER_WITHDRAWN",
+      title: "Offre retirée",
+      message: reason || "Offre retirée par le client",
+      data: { offerId: updated.id, reason },
+    });
+
+    return updated;
   }
 }
