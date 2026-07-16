@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
+import { useAutoSave } from "@/hooks/use-auto-save";
 import {
   Form,
   FormControl,
@@ -111,6 +112,20 @@ export function OfferForm({
     0
   );
 
+  // Auto-save du brouillon toutes les 5s (plan5.md §4)
+  const watchedData = form.watch();
+  const { restored, clearDraft, hasSavedDraft } = useAutoSave(
+    `offer-${applicationId}`,
+    watchedData as Record<string, unknown>
+  );
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (restored && !draftRestoredRef.current) {
+      draftRestoredRef.current = true;
+      form.reset({ ...form.formState.defaultValues, ...restored });
+    }
+  }, [restored]);
+
   async function onSubmit(data: OfferFormData) {
     try {
       setSubmitStatus({ type: null, message: "" });
@@ -131,6 +146,7 @@ export function OfferForm({
       const result = await response.json();
       setOfferId(result.offer.id);
       setStep("review");
+      clearDraft();
       onSuccess?.(result.offer.id);
 
       setSubmitStatus({
@@ -248,6 +264,13 @@ export function OfferForm({
         {step === "create" ? (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* Bannière de brouillon restauré */}
+              {hasSavedDraft && (
+                <div className="rounded-[10px] border border-[#FCD89A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E] flex items-center gap-2">
+                  <span>📝</span>
+                  <span><strong>Brouillon restauré</strong> — vous pouvez reprendre où vous vous êtes arrêté.</span>
+                </div>
+              )}
               {/* Basique */}
               <FormField
                 control={form.control}

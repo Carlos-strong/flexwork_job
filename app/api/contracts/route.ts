@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import {
   createApiHandler,
   apiSuccess,
@@ -20,16 +22,29 @@ export const GET = createApiHandler({
   methods: ["GET"],
   async handler(_req: NextRequest, ctx: ApiContext) {
     const { page, pageSize, skip } = getPaginationParams(ctx.searchParams);
+    
+    // Récupérer la session pour filtrer par utilisateur
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as { id?: string } | undefined)?.id;
 
     try {
+      // Filtrer par utilisateur : client (via mission) OU freelance
+      const where = userId ? {
+        OR: [
+          { mission: { client: { userId } } },
+          { freelancer: { userId } },
+        ],
+      } : {};
+
       const [dbContracts, total] = await Promise.all([
         prisma.contract.findMany({
+          where,
           skip,
           take: pageSize,
           orderBy: { createdAt: "desc" },
           include: { mission: { select: { title: true, clientId: true } } },
         }),
-        prisma.contract.count(),
+        prisma.contract.count({ where }),
       ]);
       return apiPaginated(
         dbContracts.map((c) => ({

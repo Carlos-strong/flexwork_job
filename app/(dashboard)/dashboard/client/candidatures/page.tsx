@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { CandidaturesHub } from "./candidatures-hub";
 import type { MissionGroup } from "./candidatures-hub";
 import type { PipelineApplication } from "@/components/missions/recruitment-pipeline";
+import { AutoRefresh } from "@/components/elements/auto-refresh";
+import { PageHeader } from "@/components/dashboard/ui";
 
 export const revalidate = 0;
 export const metadata = { title: "Gestion des candidatures" };
@@ -99,32 +101,20 @@ export default async function ClientCandidaturesPage({
   const activeMission = missions.find((m) => m.missionId === activeMissionId);
 
   return (
-    <div
-      className="mx-auto max-w-[1280px]"
-      style={{ fontFamily: "var(--font-space-grotesk, Inter, sans-serif)" }}
-    >
-      {/* Header */}
+    <div className="mx-auto max-w-[1280px] animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="mb-6">
-        <p
-          className="text-[11px] uppercase tracking-[0.08em] font-medium mb-1"
-          style={{ fontFamily: "var(--font-ibm-plex-mono, monospace)", color: "#1F7A5C" }}
-        >
-          Candidatures reçues
-        </p>
-        <h1
-          className="text-[24px] font-medium tracking-[-0.01em]"
-          style={{ fontFamily: "var(--font-fraunces, serif)", color: "#14213D" }}
-        >
-          {activeMission ? activeMission.missionTitle : "Gestion des candidatures"}
-        </h1>
-        {activeMission && (
-          <p className="text-[13.5px] text-[#6B7280] mt-1">
-            {activeMission.applications.length} candidature{activeMission.applications.length !== 1 ? "s" : ""} reçue{activeMission.applications.length !== 1 ? "s" : ""}
-            {missions.length > 1 && ` · ${missions.length} missions actives`}
-          </p>
-        )}
+        <PageHeader
+          eyebrow={<span className="uppercase tracking-[0.08em] text-[#1F7A5C]">Candidatures reçues</span>}
+          title={activeMission ? activeMission.missionTitle : "Gestion des candidatures"}
+          subtitle={
+            activeMission
+              ? `${activeMission.applications.length} candidature${activeMission.applications.length !== 1 ? "s" : ""} reçue${activeMission.applications.length !== 1 ? "s" : ""}${missions.length > 1 ? ` · ${missions.length} missions actives` : ""}`
+              : undefined
+          }
+        />
       </div>
 
+      <AutoRefresh />
       <CandidaturesHub
         missions={missions}
         defaultMissionId={activeMissionId}

@@ -1,9 +1,19 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { getPayoutBalance } from "@/lib/payouts";
+import { PageHeader, StatCard, SectionCard, EmptyState } from "@/components/dashboard/ui";
+import { WithdrawForm } from "@/components/payouts/withdraw-form";
 
 export const metadata = { title: "Mes paiements" };
 export const revalidate = 0; // Données financières privées
+
+const PAYOUT_STATUS_LABELS: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: "En attente", cls: "bg-yellow-100 text-yellow-700" },
+  PROCESSING: { label: "En cours", cls: "bg-blue-100 text-blue-700" },
+  PAID: { label: "Versé", cls: "bg-green-100 text-green-700" },
+  REJECTED: { label: "Refusé", cls: "bg-red-100 text-red-700" },
+};
 
 interface Payment {
   id: string;
@@ -47,57 +57,106 @@ export default async function FreelancerPayoutsPage() {
 
   const allPayments = await getFreelancerPayments();
   if (allPayments === null) redirect("/connexion");
-  const payouts = allPayments.filter((p) => p.type === "PAYOUT");
   const releases = allPayments.filter((p) => p.type === "RELEASE");
 
-  const totalPaid = payouts
-    .filter((p) => p.status === "SUCCEEDED")
-    .reduce((s, p) => s + p.amount, 0);
-  const totalPending = releases
-    .filter((p) => p.status !== "SUCCEEDED")
-    .reduce((s, p) => s + p.amount, 0);
+  const [balance, payoutRequests] = await Promise.all([
+    getPayoutBalance(userId),
+    prisma.payout.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
+  ]);
+
   const totalReleased = releases
     .filter((p) => p.status === "SUCCEEDED")
     .reduce((s, p) => s + p.amount, 0);
 
+  const holder = [
+    (session?.user as { firstName?: string } | undefined)?.firstName,
+    (session?.user as { lastName?: string } | undefined)?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="max-w-3xl">
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold">Paiements</h2>
-        <p className="text-sm text-[#5A5750]">Suivez vos encaissements et votre solde.</p>
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 text-[#1A1916] animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <PageHeader
+        title="Paiements"
+        subtitle="Suivez vos encaissements, votre solde et vos retraits."
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Solde disponible"
+          value={`${balance.available.toLocaleString()} €`}
+          icon="💰"
+          tone="green"
+          hint="Retirable maintenant"
+        />
+        <StatCard
+          label="Libéré (milestones)"
+          value={`${totalReleased.toLocaleString()} €`}
+          icon="🔓"
+          tone="blue"
+          hint={`${releases.filter((p) => p.status === "SUCCEEDED").length} milestone(s)`}
+        />
+        <StatCard
+          label="Retraits demandés"
+          value={`${balance.withdrawn.toLocaleString()} €`}
+          icon="💸"
+          tone="amber"
+          hint={`${payoutRequests.length} demande(s)`}
+        />
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="rounded-xl border border-[#E2E0D9] p-4">
-          <p className="text-xs text-[#5A5750]">Total reçu</p>
-          <p className="mt-1 text-xl font-bold text-green-600">{totalPaid.toLocaleString()} €</p>
-          <p className="text-xs text-[#5A5750]">{payouts.filter(p => p.status === "SUCCEEDED").length} payout(s)</p>
-        </div>
-        <div className="rounded-xl border border-[#E2E0D9] p-4">
-          <p className="text-xs text-[#5A5750]">Libéré (milestones)</p>
-          <p className="mt-1 text-xl font-bold text-blue-600">{totalReleased.toLocaleString()} €</p>
-          <p className="text-xs text-[#5A5750]">{releases.filter(p => p.status === "SUCCEEDED").length} milestone(s)</p>
-        </div>
-        <div className="rounded-xl border border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/10 p-4">
-          <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">En attente</p>
-          <p className="mt-1 text-xl font-bold text-amber-600">{totalPending.toLocaleString()} €</p>
-        </div>
-      </div>
+      {/* Retrait des fonds */}
+      <SectionCard title="Retrait des fonds" bodyClassName="p-5">
+        <WithdrawForm available={balance.available} currency={balance.currency} defaultHolder={holder} />
+        {balance.available === 0 && (
+          <p className="mt-3 text-xs text-[#8a8e82]">
+            Votre solde disponible sera crédité au fur et à mesure de la validation de vos jalons.
+          </p>
+        )}
+      </SectionCard>
 
-      <div className="rounded-xl border border-[#E2E0D9]">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Historique des paiements</h3>
-          <span className="text-xs text-[#5A5750]">{allPayments.length} transaction(s)</span>
-        </div>
-        {allPayments.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-[#5A5750]">Aucun paiement pour le moment.</p>
-            <p className="text-xs text-[#5A5750] mt-1">
-              Les paiements apparaîtront ici une fois les milestones validés et les fonds libérés.
-            </p>
+      {/* Historique des demandes de retrait */}
+      {payoutRequests.length > 0 && (
+        <SectionCard title="Mes demandes de retrait" count={payoutRequests.length} bodyClassName="">
+          <div className="divide-y divide-[#E2E0D9]">
+            {payoutRequests.map((p) => {
+              const st = PAYOUT_STATUS_LABELS[p.status] ?? PAYOUT_STATUS_LABELS.PENDING;
+              return (
+                <div key={p.id} className="flex items-center justify-between px-6 py-4">
+                  <div>
+                    <p className="text-sm font-medium">
+                      {p.method === "IBAN" ? "Virement bancaire" : "Payoneer"} — {p.destination}
+                    </p>
+                    <p className="text-xs text-[#5A5750]">
+                      {new Date(p.createdAt).toLocaleDateString("fr-FR", {
+                        day: "numeric", month: "long", year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{p.amount.toLocaleString()} {p.currency}</p>
+                    <span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${st.cls}`}>
+                      {st.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </SectionCard>
+      )}
+
+      <SectionCard title="Historique des paiements" count={allPayments.length} bodyClassName="">
+        {allPayments.length === 0 ? (
+          <EmptyState
+            icon="💳"
+            title="Aucun paiement pour le moment"
+            description="Les paiements apparaîtront ici une fois les milestones validés et les fonds libérés."
+            dashed={false}
+          />
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-[#E2E0D9]">
             {allPayments.map((p) => {
               const isPayout = p.type === "PAYOUT";
               const isRelease = p.type === "RELEASE";
@@ -136,7 +195,7 @@ export default async function FreelancerPayoutsPage() {
             })}
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

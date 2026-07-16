@@ -14,16 +14,17 @@ import { pushNotification } from "./socket-server-client";
 import { conversations, addSystemMessage } from "./collaboration";
 import { stripeEscrow } from "./escrow/stripe";
 import { contracts } from "./mock-data";
+import { resolveExpiredAppeals } from "./services/appeal-resolver";
 
 // ============================================================
 // Handlers métier pour chaque type de job
 // ============================================================
 
 async function handleMissionCreated(data: Record<string, unknown>): Promise<void> {
-  const { title, skills, budget } = data as {
+  const { title, budget, skills } = data as {
     missionId: string; title: string; skills: string[]; budget: number;
   };
-  console.log(`[Worker] 🚀 Nouvelle mission: "${title}"`);
+  if (process.env.NODE_ENV === "development") console.log(`[Worker] 🚀 Nouvelle mission: "${title}"`);
   await notifications.missionCreatedToClient({ title, budget, skills });
 }
 
@@ -31,8 +32,10 @@ async function handleMissionUpdated(data: Record<string, unknown>): Promise<void
   const { missionId, title, changes } = data as {
     missionId: string; title: string; changes: string[];
   };
-  console.log(`[Worker] 📝 Mission mise à jour: "${title}" (${missionId})`);
-  console.log(`[Worker]   → Modifications: ${changes?.join(", ")}`);
+  if (process.env.NODE_ENV === "development") {
+    console.log(`[Worker] 📝 Mission mise à jour: "${title}" (${missionId})`);
+    console.log(`[Worker]   → Modifications: ${changes?.join(", ")}`);
+  }
 }
 
 async function handleApplicationSubmitted(data: Record<string, unknown>): Promise<void> {
@@ -367,6 +370,15 @@ async function handleWebhookTrustEngine(data: Record<string, unknown>): Promise<
   }
 }
 
+async function handlePayoutRequested(data: Record<string, unknown>): Promise<void> {
+  const { payoutId, amount, method } = data as {
+    payoutId: string; userId: string; amount: number; method: string;
+  };
+  console.log(`[Worker] 💸 Demande de retrait ${payoutId} — ${amount}€ via ${method}`);
+  // Traitement bancaire réel hors périmètre : la demande est enregistrée en base
+  // (statut PENDING) et sera traitée par l'équipe finance / un provider de payout.
+}
+
 async function handleNotificationEmail(data: Record<string, unknown>): Promise<void> {
   const { to, subject, template, templateData } = data as {
     to: string; subject: string; template: string; templateData?: Record<string, unknown>;
@@ -411,6 +423,7 @@ const handlers: Record<string, (data: Record<string, unknown>) => Promise<void>>
   PAYMENT_DEPOSIT: handlePaymentDeposit,
   PAYMENT_RELEASE: handlePaymentRelease,
   PAYMENT_PAYOUT: handlePaymentPayout,
+  PAYOUT_REQUESTED: handlePayoutRequested,
   WEBHOOK_STRIPE: handleWebhookStripe,
   WEBHOOK_TRUSTENGINE: handleWebhookTrustEngine,
   NOTIFICATION_EMAIL: handleNotificationEmail,
@@ -423,6 +436,22 @@ const handlers: Record<string, (data: Record<string, unknown>) => Promise<void>>
 const queueNames: QueueName[] = ["missions", "applications", "contracts", "payments", "webhooks", "notifications"];
 
 const workers: Worker[] = [];
+
+// Balayage périodique des fenêtres d'appel de litige (résolution auto à 48h).
+const APPEAL_SWEEP_INTERVAL_MS = 15 * 60 * 1000; // toutes les 15 minutes
+let appealSweepTimer: ReturnType<typeof setInterval> | null = null;
+
+function startAppealSweep(): void {
+  if (appealSweepTimer) return;
+  const run = () => {
+    resolveExpiredAppeals().catch((err) =>
+      console.error("[Worker] 🔴 Balayage des appels échoué:", (err as Error).message)
+    );
+  };
+  run(); // premier passage immédiat au démarrage
+  appealSweepTimer = setInterval(run, APPEAL_SWEEP_INTERVAL_MS);
+  console.log(`[Worker] ⏱️  Balayage des fenêtres d'appel actif (toutes les ${APPEAL_SWEEP_INTERVAL_MS / 60000} min)`);
+}
 
 function startWorkers(): void {
   for (const name of queueNames) {
@@ -465,6 +494,8 @@ function startWorkers(): void {
 
   console.log(`\n[Worker] ✅ ${workers.length} workers BullMQ actifs`);
   console.log(`[Worker] 📋 Queues: ${queueNames.join(", ")}`);
+
+  startAppealSweep();
 }
 
 function stopWorkers(): void {
@@ -472,6 +503,10 @@ function stopWorkers(): void {
     worker.close();
   }
   workers.length = 0;
+  if (appealSweepTimer) {
+    clearInterval(appealSweepTimer);
+    appealSweepTimer = null;
+  }
   console.log("[Worker] 🛑 Workers arrêtés");
 }
 

@@ -801,7 +801,7 @@ export function CandidaturesTable({ applications }: { applications: ClientApplic
                       <React.Fragment key={app.id}>
                         <tr className={`border-b border-[#F5F5F0] hover:bg-[#FAFAF8] transition-colors ${isExpanded ? "bg-[#F9F8FE]" : ""}`}>
                           <td className="px-4 py-3">
-                            <Link href={`/dashboard/client/freelancer/${app.freelancerId}`} className="flex items-center gap-2.5 hover:opacity-80">
+                            <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-[#EEF2FD] flex items-center justify-center text-[#2D5BE3] text-xs font-bold shrink-0">
                                 {app.freelancerName.charAt(0).toUpperCase()}
                               </div>
@@ -809,7 +809,7 @@ export function CandidaturesTable({ applications }: { applications: ClientApplic
                                 <p className="font-medium text-[#1A1916] truncate max-w-[130px]">{app.freelancerName}</p>
                                 <p className="text-[11px] text-[#5A5750] truncate max-w-[130px]">{app.freelancerTitle}</p>
                               </div>
-                            </Link>
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <Link href={`/dashboard/client/missions/${app.missionId}`} className="text-[#2D5BE3] font-medium text-xs hover:underline truncate block max-w-[140px]">
@@ -941,9 +941,7 @@ export function CandidaturesTable({ applications }: { applications: ClientApplic
                                     <Link href={`/dashboard/client/messages?freelancer=${app.freelancerId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[#E2E0D9] bg-white px-3 py-2 text-xs font-semibold text-[#5A5750] hover:bg-[#FAFAF8]">
                                       💬 Messagerie
                                     </Link>
-                                    <Link href={`/dashboard/client/freelancer/${app.freelancerId}`} className="inline-flex items-center gap-1.5 rounded-lg border border-[#E2E0D9] bg-white px-3 py-2 text-xs font-semibold text-[#5A5750] hover:bg-[#FAFAF8]">
-                                      👤 Voir le profil
-                                    </Link>
+
                                     {getActions(app).length === 0 && app.status !== "OFFER_ACCEPTED" && (
                                       <span className="text-xs text-[#9C9A95] italic">Aucune action disponible — statut terminal.</span>
                                     )}

@@ -30,15 +30,18 @@ export function getSocket(): Socket {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { io } = require("socket.io-client") as typeof import("socket.io-client");
 
-  _socket = io(
-    process.env.NEXT_PUBLIC_WS_URL || "http://localhost:3001",
-    {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: Infinity,
-    }
-  );
+  // Auto-détection de l'hôte pour supporter l'accès depuis d'autres appareils sur le réseau local
+  const wsHost =
+    typeof window !== "undefined" ? window.location.hostname : "localhost";
+  const wsUrl =
+    process.env.NEXT_PUBLIC_WS_URL || `http://${wsHost}:3001`;
+
+  _socket = io(wsUrl, {
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: Infinity,
+  });
 
   if (process.env.NODE_ENV === "development") {
     globalThis.__flexSocket = _socket;

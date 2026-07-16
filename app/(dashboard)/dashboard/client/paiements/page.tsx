@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { PageHeader, StatCard, SectionCard, EmptyState } from "@/components/dashboard/ui";
 
 export const metadata = { title: "Mes paiements" };
 export const revalidate = 0; // Données financières privées
@@ -64,53 +65,58 @@ export default async function ClientPaymentsPage() {
   const totalReleased = releases.reduce((s, p) => s + p.amount, 0);
 
   return (
-    <div className="max-w-3xl">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-2xl font-semibold">Paiements</h2>
-          <p className="text-sm text-[#5A5750]">Historique de vos transactions.</p>
-        </div>
-        <Link
-          href="/dashboard/client/paiements/escrow"
-          className="rounded-lg bg-[#2D5BE3] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#1F4DD4] transition-colors"
-        >
-          + Déposer des fonds
-        </Link>
-      </div>
+    <div className="mx-auto flex max-w-4xl flex-col gap-6 text-[#1A1916] animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <PageHeader
+        title="Paiements"
+        subtitle="Historique de vos transactions escrow, libérations de jalons et versements."
+        actions={
+          <Link
+            href="/dashboard/client/paiements/escrow"
+            className="flex items-center gap-2 rounded-[10px] bg-[#2D5BE3] px-[18px] py-[10px] text-[13px] font-semibold text-white transition-colors hover:bg-[#1F4DD4]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Déposer des fonds
+          </Link>
+        }
+      />
 
       {/* Résumé */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <div className="rounded-xl border border-[#E2E0D9] p-4">
-          <p className="text-xs text-[#5A5750]">Total déposé</p>
-          <p className="mt-1 text-xl font-bold text-blue-600">{totalDeposited.toLocaleString()} €</p>
-          <p className="text-xs text-[#5A5750]">{deposits.length} transaction(s)</p>
-        </div>
-        <div className="rounded-xl border border-[#E2E0D9] p-4">
-          <p className="text-xs text-[#5A5750]">Total libéré</p>
-          <p className="mt-1 text-xl font-bold text-green-600">{totalReleased.toLocaleString()} €</p>
-          <p className="text-xs text-[#5A5750]">{releases.length} milestone(s)</p>
-        </div>
-        <div className="rounded-xl border border-[#E2E0D9] p-4">
-          <p className="text-xs text-[#5A5750]">Payouts effectués</p>
-          <p className="mt-1 text-xl font-bold text-purple-600">{payouts.length}</p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          label="Total déposé"
+          value={`${totalDeposited.toLocaleString()} €`}
+          icon="💰"
+          tone="blue"
+          hint={`${deposits.length} transaction(s)`}
+        />
+        <StatCard
+          label="Total libéré"
+          value={`${totalReleased.toLocaleString()} €`}
+          icon="🔓"
+          tone="green"
+          hint={`${releases.length} milestone(s)`}
+        />
+        <StatCard
+          label="Payouts effectués"
+          value={payouts.length}
+          icon="💸"
+          tone="purple"
+        />
       </div>
 
       {/* Historique */}
-      <div className="rounded-xl border border-[#E2E0D9]">
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Historique</h3>
-          <span className="text-xs text-[#5A5750]">{payments.length} transaction(s)</span>
-        </div>
+      <SectionCard title="Historique" count={payments.length} bodyClassName="">
         {payments.length === 0 ? (
-          <div className="p-12 text-center">
-            <p className="text-[#5A5750]">Aucun paiement pour le moment.</p>
-            <p className="text-xs text-[#5A5750] mt-1">
-              Les paiements apparaîtront ici après le dépôt des fonds en escrow.
-            </p>
-          </div>
+          <EmptyState
+            icon="💳"
+            title="Aucun paiement pour le moment"
+            description="Les paiements apparaîtront ici après le dépôt des fonds en escrow."
+            dashed={false}
+          />
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-[#E2E0D9]">
             {payments.map((p) => {
               const typeInfo = TYPE_LABELS[p.type] || { label: p.type, icon: "💳", color: "text-[#5A5750]" };
               return (
@@ -146,7 +152,7 @@ export default async function ClientPaymentsPage() {
             })}
           </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

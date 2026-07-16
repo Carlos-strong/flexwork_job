@@ -102,7 +102,7 @@ export default function ClientContratsPage() {
             return (
               <Link
                 key={c.id}
-                href={`/dashboard/client/missions/${c.missionId}/contract`}
+                href={`/dashboard/pilotage/${c.id}`}
                 className="block rounded-xl border border-[#E2E0D9] p-5 hover:border-[#C3D1F8] transition-colors"
               >
                 <div className="flex items-center justify-between">

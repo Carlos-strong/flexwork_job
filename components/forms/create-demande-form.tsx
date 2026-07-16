@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useAutoSave } from "@/hooks/use-auto-save";
 
 interface DemandeFormData {
   categorieId: string;
@@ -145,6 +146,16 @@ export function CreateDemandForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Auto-save du brouillon toutes les 5s (plan5.md §4)
+  const { restored, clearDraft, hasSavedDraft } = useAutoSave("demande-create", data as unknown as Record<string, unknown>);
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (restored && !draftRestoredRef.current) {
+      draftRestoredRef.current = true;
+      setData((prev) => ({ ...prev, ...restored }));
+    }
+  }, [restored]);
+
   // Charger les données au montage
   useEffect(() => {
     const loadData = async () => {
@@ -260,6 +271,7 @@ export function CreateDemandForm() {
       }
 
       // Redirection vers le détail de la demande
+      clearDraft();
       router.push(`/demandes/${result.id}`);
     } catch (e) {
       setError("Erreur de connexion au serveur");
@@ -269,6 +281,13 @@ export function CreateDemandForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Bannière de brouillon restauré */}
+      {hasSavedDraft && (
+        <div className="rounded-[10px] border border-[#FCD89A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E] flex items-center gap-2">
+          <span>📝</span>
+          <span><strong>Brouillon restauré</strong> — vos modifications non sauvegardées ont été récupérées.</span>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold">Créer une demande de service</h1>
         <p className="text-[#5A5750] mt-1">

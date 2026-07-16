@@ -41,10 +41,12 @@ export type JobType =
   | "CONTRACT_COMPLETED"
   | "MILESTONE_SUBMITTED"
   | "MILESTONE_APPROVED"
+  | "MILESTONE_REJECTED"
   | "MILESTONE_RELEASED"
   | "PAYMENT_DEPOSIT"
   | "PAYMENT_RELEASE"
   | "PAYMENT_PAYOUT"
+  | "PAYOUT_REQUESTED"
   | "MILESTONE_COMPLETED"
   | "WEBHOOK_STRIPE"
   | "WEBHOOK_TRUSTENGINE"
@@ -83,10 +85,12 @@ export type JobDataMap = {
   CONTRACT_COMPLETED: { contractId: string; missionTitle: string; totalAmount: number };
   MILESTONE_SUBMITTED: { milestoneId: string; contractId: string; title: string; amount: number };
   MILESTONE_APPROVED: { milestoneId: string; contractId: string; title: string; amount: number };
+  MILESTONE_REJECTED: { milestoneId: string; contractId: string; title: string; amount: number; reason: string };
   MILESTONE_RELEASED: { milestoneId: string; contractId: string; title: string; amount: number };
   PAYMENT_DEPOSIT: { paymentId: string; contractId: string; amount: number; stripePaymentIntentId?: string; virtualCardId?: string; virtualCardTransactionId?: string; authorizationCode?: string };
   PAYMENT_RELEASE: { paymentId: string; contractId: string; milestoneId: string; milestoneTitle: string; amount: number };
   PAYMENT_PAYOUT: { paymentId: string; freelancerId: string; amount: number; stripeAccountId: string };
+  PAYOUT_REQUESTED: { payoutId: string; userId: string; amount: number; method: string };
   MILESTONE_COMPLETED: { milestoneId: string; contractId: string; title: string; amount: number };
   WEBHOOK_STRIPE: { eventType: string; eventId: string; data: Record<string, unknown> };
   WEBHOOK_TRUSTENGINE: { event: string; escrowId: string; data: Record<string, unknown> };
@@ -152,11 +156,13 @@ const jobQueueMap: Record<JobType, QueueName> = {
   CONTRACT_COMPLETED: "contracts",
   MILESTONE_SUBMITTED: "contracts",
   MILESTONE_APPROVED: "contracts",
+  MILESTONE_REJECTED: "contracts",
   MILESTONE_RELEASED: "contracts",
   MILESTONE_COMPLETED: "contracts",
   PAYMENT_DEPOSIT: "payments",
   PAYMENT_RELEASE: "payments",
   PAYMENT_PAYOUT: "payments",
+  PAYOUT_REQUESTED: "payments",
   WEBHOOK_STRIPE: "webhooks",
   WEBHOOK_TRUSTENGINE: "webhooks",
   NOTIFICATION_EMAIL: "notifications",

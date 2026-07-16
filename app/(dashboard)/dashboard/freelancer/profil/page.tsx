@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { PageHeader } from "@/components/dashboard/ui";
 
 // ── Types ──
 
@@ -211,21 +212,21 @@ export default function FreelancerProfilPage() {
 
   return (
     <div className="max-w-[800px] mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500 text-[#1A1916]">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-[#1A1916]">Mes profils professionnels</h2>
-          <p className="text-[14px] text-[#5A5750] mt-1">
-            Créez et gérez vos profils (Phase B1). Un freelance peut avoir plusieurs profils.
-          </p>
-        </div>
-        {section === "liste" && (
-          <button
-            onClick={() => { setForm(emptyProfil()); setSection("creation"); setEditingIndex(null); }}
-            className="rounded-[10px] bg-[#2D5BE3] px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-[#1F4DD4] transition-colors shadow-sm"
-          >
-            + Nouveau profil
-          </button>
-        )}
+      <div className="mb-8">
+        <PageHeader
+          title="Mes profils professionnels"
+          subtitle="Créez et gérez vos profils. Un freelance peut avoir plusieurs profils."
+          actions={
+            section === "liste" ? (
+              <button
+                onClick={() => { setForm(emptyProfil()); setSection("creation"); setEditingIndex(null); }}
+                className="rounded-[10px] bg-[#2D5BE3] px-5 py-2.5 text-[13px] font-semibold text-white hover:bg-[#1F4DD4] transition-colors shadow-sm"
+              >
+                + Nouveau profil
+              </button>
+            ) : undefined
+          }
+        />
       </div>
 
       {section === "liste" && (

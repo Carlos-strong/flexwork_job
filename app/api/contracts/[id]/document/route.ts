@@ -6,6 +6,7 @@ import {
   generateContractHtml,
   getContractTemplateData,
 } from "@/lib/services/contract-template.service";
+import { generateContractDocx } from "@/lib/services/contract-docx.service";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +59,20 @@ export async function GET(
       return NextResponse.json({ error: "Accès non autorisé à ce contrat" }, { status: 403 });
     }
 
-    // 3. Générer le HTML
-    const html = generateContractHtml(data);
+    // 3. Générer selon le format demandé
+    if (format === "docx") {
+      const docxBuffer = await generateContractDocx(data);
+      return new NextResponse(new Uint8Array(docxBuffer), {
+        status: 200,
+        headers: {
+          "Content-Type":
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "Content-Disposition": `attachment; filename="contrat-${data.reference}.docx"`,
+        },
+      });
+    }
+
+    const html = await generateContractHtml(data);
 
     if (format === "json") {
       return NextResponse.json({

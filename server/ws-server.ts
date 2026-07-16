@@ -20,9 +20,14 @@ const ORIGIN = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 const httpServer = createServer();
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const io = new Server(httpServer, {
   cors: {
-    origin: [ORIGIN, "http://localhost:3000"],
+    // En dev, reflète l'origine pour permettre l'accès depuis d'autres appareils du réseau
+    origin: isDev
+      ? (origin, callback) => callback(null, origin || "*")
+      : [ORIGIN, "http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST"],
   },

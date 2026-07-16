@@ -55,10 +55,10 @@ const nextConfig = {
     ];
   },
 
-  // Webpack : désactiver le cache en dev pour éviter les stales
+  // Webpack : utiliser le cache fichiers pour HMR rapide en dev
   webpack: (config, { dev }) => {
     if (dev) {
-      config.cache = false;
+      config.cache = { type: "filesystem", allowCollectingMemory: true };
     }
     return config;
   },

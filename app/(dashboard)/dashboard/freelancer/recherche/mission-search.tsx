@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { useScrollRestore } from "@/hooks/use-scroll-restore";
 
 interface Mission {
   id: string; title: string; description: string; budget: number;
@@ -22,8 +24,11 @@ interface PaginatedResponse<T> {
 export function MissionSearch() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
+  const { filters, setFilter } = useUrlFilters<{ skill?: string }>();
+  const skillFilter = filters.skill ?? "";
+
+  // Restaurer la position de scroll au retour (plan5.md §7)
+  useScrollRestore("freelancer-mission-search", { mode: "page" });
 
   const fetchMissions = useCallback(async () => {
     setLoading(true);
@@ -37,17 +42,13 @@ export function MissionSearch() {
       // Gère à la fois l'ancien format (tableau brut) et le nouveau (paginé)
       const items: Mission[] = Array.isArray(json) ? json : (json as PaginatedResponse<Mission>).data ?? [];
 
-      const filtered = search
-        ? items.filter((m) => m.title.toLowerCase().includes(search.toLowerCase()))
-        : items;
-
-      setMissions(filtered);
+      setMissions(items);
     } catch {
       setMissions([]);
     } finally {
       setLoading(false);
     }
-  }, [search, skillFilter]);
+  }, [skillFilter]);
 
   useEffect(() => {
     fetchMissions();
@@ -57,16 +58,10 @@ export function MissionSearch() {
     <div>
       <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher une mission..."
-          className="flex-1 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
-        />
-        <input
           value={skillFilter}
-          onChange={(e) => setSkillFilter(e.target.value)}
-          placeholder="Compétence"
-          className="w-full sm:w-48 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
+          onChange={(e) => setFilter("skill", e.target.value)}
+          placeholder="Filtrer par compétence..."
+          className="flex-1 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
         />
       </div>
 

@@ -2,12 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { PHASE_LABELS } from "@/lib/contract-workflow";
+import type { ContractPhase } from "@/lib/contract-workflow";
+import { PageHeader, SectionCard } from "@/components/dashboard/ui";
 
 export const revalidate = 0; // Données privées utilisateur
 
 interface Contract {
   id: string; missionTitle: string; clientName: string;
-  status: string; escrowAmount: number; escrowId?: string; stripePaymentIntentId?: string;
+  status: string; phase: ContractPhase;
+  escrowAmount: number; escrowId?: string;
+  validatedCount: number; totalMilestones: number;
 }
 
 async function getData(userId: string) {
@@ -22,7 +27,10 @@ async function getData(userId: string) {
     prisma.contract.findMany({
       where: { freelancerId: freelancerProfile.id },
       orderBy: { createdAt: "desc" },
-      include: { mission: { include: { client: true } } },
+      include: {
+        mission: { include: { client: true } },
+        milestones: { select: { status: true } },
+      },
     }),
     prisma.mission.count({ where: { status: "OPEN" } }),
   ]);
@@ -32,8 +40,11 @@ async function getData(userId: string) {
     missionTitle: c.mission.title,
     clientName: c.mission.client.companyName ?? "Client",
     status: c.status,
+    phase: mapPrismaStatusToPhase(c.status),
     escrowAmount: c.escrowAmount ?? 0,
     escrowId: c.escrowId ?? undefined,
+    validatedCount: c.milestones.filter((m) => m.status === "APPROVED" || m.status === "RELEASED").length,
+    totalMilestones: c.milestones.length,
   }));
 
   const activeContracts = contracts.filter((c) => c.status === "ACTIVE").length;
@@ -54,18 +65,18 @@ export default async function FreelancerDashboardPage() {
 
   return (
     <div className="mx-auto flex flex-col gap-6 max-w-6xl animate-in fade-in slide-in-from-bottom-2 duration-500 text-[#1A1916]">
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-2">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#1A1916]">Tableau de bord</h1>
-          <p className="text-[14px] text-[#5A5750] mt-1">Suivez vos missions et vos paiements</p>
-        </div>
-        <Link
-          href="/dashboard/freelancer/recherche"
-          className="flex items-center gap-2 bg-[#2D5BE3] text-white hover:bg-[#1F4DD4] px-[18px] py-[10px] rounded-[10px] text-[13px] font-semibold transition-colors"
-        >
-          🔍 Trouver des missions
-        </Link>
-      </div>
+      <PageHeader
+        title="Tableau de bord"
+        subtitle="Suivez vos missions et vos paiements."
+        actions={
+          <Link
+            href="/dashboard/freelancer/recherche"
+            className="flex items-center gap-2 bg-[#2D5BE3] text-white hover:bg-[#1F4DD4] px-[18px] py-[10px] rounded-[10px] text-[13px] font-semibold transition-colors"
+          >
+            🔍 Trouver des missions
+          </Link>
+        }
+      />
 
       {/* Stats workflow */}
       <div className="flex items-stretch bg-white border border-[#E2E0D9] rounded-[16px] overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] flex-col sm:flex-row">
@@ -93,15 +104,7 @@ export default async function FreelancerDashboardPage() {
 
       {/* Mes contrats actifs */}
       {contracts.length > 0 && (
-        <div className="bg-white border border-[#E2E0D9] rounded-[16px] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#E2E0D9] flex-wrap gap-3">
-            <div className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#1A1916]">
-              <span className="inline-flex items-center justify-center bg-[#FAFAF8] text-[#5A5750] border border-[#E2E0D9] px-2.5 py-1 rounded-[20px] text-[11px]">
-                01
-              </span>
-              Mes contrats récents
-            </div>
-          </div>
+        <SectionCard title="Mes contrats récents" count={1} bodyClassName="">
           <div className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[13px] text-left">
@@ -109,27 +112,34 @@ export default async function FreelancerDashboardPage() {
                   {contracts.map((c) => (
                     <tr key={c.id} className="hover:bg-[#FAFAF8] group transition-colors border-b border-[#E2E0D9] last:border-0">
                       <td className="py-4 px-5">
-                        <Link href={`/dashboard/freelancer/contrat/${c.id}`} className="block">
+                        <Link href={`/dashboard/pilotage/${c.id}`} className="block">
                           <div className="font-semibold text-[#1A1916]">{c.missionTitle}</div>
-                          <div className="text-[12px] text-[#5A5750] mt-1">Client: {c.clientName}</div>
-                          {c.escrowId && (
-                            <p className="mt-1 text-[11px] text-[#9C9A95] font-mono">
-                              Escrow: {c.escrowId}
-                            </p>
-                          )}
+                          <div className="text-[12px] text-[#5A5750] mt-1">
+                            Client : {c.clientName}
+                            {c.phase === "CONTRACT_ACTIVE" && (
+                              <span className="ml-2 text-[#2D5BE3]">
+                                · {c.validatedCount}/{c.totalMilestones} jalons
+                              </span>
+                            )}
+                          </div>
                         </Link>
                       </td>
                       <td className="py-4 px-5 text-right font-mono text-[14px] text-[#1A1916] font-bold">
                         {c.escrowAmount?.toLocaleString()} €
                       </td>
                       <td className="py-4 px-5 text-right">
-                        <span className={`inline-block rounded-[20px] px-[10px] py-[4px] text-[11px] font-semibold ${
-                          c.status === "ACTIVE" ? "bg-[#E6F5EE] text-[#1A7A4A] border border-[#9FD4B4]" :
-                          c.status === "PENDING" ? "bg-[#FEF3C7] text-[#B45309] border border-[#FCD89A]" :
-                          "bg-[#FAFAF8] text-[#5A5750] border border-[#E2E0D9]"
-                        }`}>
-                          {c.status === "ACTIVE" ? "Actif" : c.status === "PENDING" ? "En attente" : c.status}
-                        </span>
+                        <ContractPhaseBadge phase={c.phase} />
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <Link
+                          href={`/dashboard/pilotage/${c.id}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#2D5BE3] text-white text-[11px] font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Pilotage
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                          </svg>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -137,19 +147,20 @@ export default async function FreelancerDashboardPage() {
               </table>
             </div>
           </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* 🤖 Uma Recommandations */}
       {recommendations.length > 0 && (
-         <div className="bg-white border border-[#E2E0D9] rounded-[16px] shadow-[0_2px_8px_rgba(0,0,0,0.04),0_4px_12px_rgba(0,0,0,0.03)] overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-[#E2E0D9]">
-            <div className="flex flex-wrap items-center gap-2 text-[13px] font-semibold uppercase tracking-[0.04em] text-[#1A1916]">
+        <SectionCard
+          title={
+            <span className="flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#EEF2FD] text-lg leading-none">🤖</span>
               Uma vous recommande
-            </div>
-          </div>
-          <div className="p-5 grid gap-4 md:grid-cols-2">
+            </span>
+          }
+          bodyClassName="p-5 grid gap-4 md:grid-cols-2"
+        >
             {recommendations.slice(0, 4).map((r: {id:string;title:string;budget:number;score:number;skills:string[]}) => (
               <Link
                 key={r.id}
@@ -175,8 +186,7 @@ export default async function FreelancerDashboardPage() {
                 </div>
               </Link>
             ))}
-          </div>
-        </div>
+        </SectionCard>
       )}
 
       {/* Guide Rapide */}
@@ -201,5 +211,41 @@ export default async function FreelancerDashboardPage() {
         </Link>
       </div>
     </div>
+  );
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+function mapPrismaStatusToPhase(status: string): ContractPhase {
+  switch (status) {
+    case "PENDING": return "CONTRACT_GENERATED";
+    case "ACTIVE": return "CONTRACT_ACTIVE";
+    case "COMPLETED": return "COMPLETED";
+    case "DISPUTED": return "DISPUTE_OPENED";
+    default: return "NEGOTIATION";
+  }
+}
+
+function ContractPhaseBadge({ phase }: { phase: ContractPhase }) {
+  const label = PHASE_LABELS[phase] || phase;
+
+  const config: Record<string, string> = {
+    NEGOTIATION: "bg-[#EEF2FD] text-[#2D5BE3] border-[#C3D1F8]",
+    TERMS_LOCKED: "bg-[#EEF2FD] text-[#2D5BE3] border-[#C3D1F8]",
+    CONTRACT_GENERATED: "bg-[#EEF2FD] text-[#2D5BE3] border-[#C3D1F8]",
+    PENDING_FUNDING: "bg-[#FEF3C7] text-[#B45309] border-[#FCD89A]",
+    FUNDED: "bg-[#E6F5EE] text-[#1A7A4A] border-[#9FD4B4]",
+    CONTRACT_ACTIVE: "bg-[#E6F5EE] text-[#1A7A4A] border-[#9FD4B4]",
+    CLOSING: "bg-[#FEF3C7] text-[#B45309] border-[#FCD89A]",
+    COMPLETED: "bg-[#E6F5EE] text-[#1A7A4A] border-[#9FD4B4]",
+    DISPUTE_OPENED: "bg-[#FDECEA] text-[#C0392B] border-[#F5BCBC]",
+    DISPUTE_RESOLVED: "bg-[#E6F5EE] text-[#1A7A4A] border-[#9FD4B4]",
+    CANCELLED: "bg-[#FDECEA] text-[#C0392B] border-[#F5BCBC]",
+  };
+
+  return (
+    <span className={`inline-flex items-center border px-[10px] py-[4px] rounded-[20px] text-[11px] font-semibold ${config[phase] || "bg-[#FAFAF8] text-[#5A5750] border-[#E2E0D9]"}`}>
+      {label}
+    </span>
   );
 }

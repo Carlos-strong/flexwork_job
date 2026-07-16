@@ -1,13 +1,16 @@
 import { MissionSearch } from "./mission-search";
+import { PageHeader } from "@/components/dashboard/ui";
 
 export const metadata = { title: "Recherche de missions" };
 
 export default function FreelancerSearchPage() {
   return (
-    <div>
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="mb-8">
-        <h2 className="text-2xl font-semibold">Recherche de missions</h2>
-        <p className="text-sm text-[#5A5750]">Trouvez la mission qui correspond à vos compétences.</p>
+        <PageHeader
+          title="Recherche de missions"
+          subtitle="Trouvez la mission qui correspond à vos compétences."
+        />
       </div>
       <MissionSearch />
     </div>

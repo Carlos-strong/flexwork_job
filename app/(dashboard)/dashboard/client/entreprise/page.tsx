@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PageHeader, SectionCard } from "@/components/dashboard/ui";
 
 type KycStatus = "EN_ATTENTE" | "VALIDE" | "REJETE";
 
@@ -76,16 +77,14 @@ export default function ClientEntreprisePage() {
   const statusCfg = STATUS_CONFIG[kycStatus];
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <div>
-        <h2 className="text-2xl font-semibold">Mon entreprise</h2>
-        <p className="text-sm text-[#5A5750]">
-          KYC Entreprise — requis pour signer un contrat ou effectuer un paiement
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6 text-[#1A1916] animate-in fade-in slide-in-from-bottom-2 duration-500">
+      <PageHeader
+        title="Mon entreprise"
+        subtitle="KYC entreprise — requis pour signer un contrat ou effectuer un paiement."
+      />
 
       {/* Statut KYC */}
-      <div className={`rounded-xl border-2 p-5 ${statusCfg.color}`}>
+      <div className={`rounded-[16px] border-2 p-5 ${statusCfg.color}`}>
         <div className="flex items-center gap-3">
           <span className="text-2xl">{statusCfg.icon}</span>
           <div>
@@ -108,9 +107,7 @@ export default function ClientEntreprisePage() {
       </div>
 
       {/* Formulaire */}
-      <div className="rounded-xl border border-[#E2E0D9] p-6 space-y-6">
-        <h3 className="font-semibold">Informations de l&apos;entreprise</h3>
-
+      <SectionCard title="Informations de l'entreprise" bodyClassName="space-y-6 p-6">
         <div className="grid gap-4">
           <div>
             <label className="block text-sm font-medium mb-1.5">Nom de l&apos;entreprise</label>
@@ -140,11 +137,10 @@ export default function ClientEntreprisePage() {
         >
           {saving ? "Enregistrement…" : saved ? "✅ Enregistré" : "Enregistrer"}
         </button>
-      </div>
+      </SectionCard>
 
       {/* Documents */}
-      <div className="rounded-xl border border-[#E2E0D9] p-6 space-y-5">
-        <h3 className="font-semibold">Documents justificatifs</h3>
+      <SectionCard title="Documents justificatifs" bodyClassName="space-y-5 p-6">
         <p className="text-sm text-[#5A5750]">
           Ces documents sont requis pour valider votre compte entreprise et effectuer des paiements.
         </p>
@@ -175,7 +171,7 @@ export default function ClientEntreprisePage() {
         <div className="rounded-lg bg-[#F5F5F0]/40 px-4 py-3 text-xs text-[#5A5750]">
           🔒 Vos documents sont chiffrés et accessibles uniquement par notre équipe de vérification.
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }

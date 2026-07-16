@@ -43,6 +43,16 @@ interface Message {
 
 type DeliveryStatus = "sending" | "sent" | "delivered" | "read";
 
+interface EmailLogEntry {
+  id: string;
+  subject: string;
+  category: string;
+  preview: string;
+  status: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface MessagesViewProps {
   /** "client" ou "freelancer" — influe sur le libellé et le lien contrat */
   role?: "client" | "freelancer";
@@ -102,9 +112,26 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+const EMAIL_CATEGORY_ICONS: Record<string, string> = {
+  verification: "🔐",
+  application: "📩",
+  offer: "📨",
+  contract: "📝",
+  payment: "💰",
+  mission: "🚀",
+  system: "🔔",
+};
+
+function fmtEmailDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) +
+    " · " + d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
 // ── Composant principal ────────────────────────────────
 
 export function MessagesView({ role = "client" }: MessagesViewProps) {
+  const [activeTab, setActiveTab] = useState<"chat" | "emails">("chat");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selected, setSelected] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -114,6 +141,47 @@ export function MessagesView({ role = "client" }: MessagesViewProps) {
   const [currentUser, setCurrentUser] = useState<{ id: string; name: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // ── Onglet Emails ──────────────────────────────────
+  const [emails, setEmails] = useState<EmailLogEntry[]>([]);
+  const [emailsLoading, setEmailsLoading] = useState(true);
+  const [selectedEmail, setSelectedEmail] = useState<EmailLogEntry | null>(null);
+  const [emailDetail, setEmailDetail] = useState<{ html: string } | null>(null);
+
+  const unreadEmailsCount = useMemo(
+    () => emails.filter((e) => !e.readAt).length,
+    [emails]
+  );
+
+  const loadEmails = useCallback(() => {
+    fetch("/api/emails")
+      .then((r) => (r.ok ? r.json() : { data: [] }))
+      .then((d) => setEmails(Array.isArray(d) ? d : (d.data ?? [])))
+      .catch(() => {})
+      .finally(() => setEmailsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    loadEmails();
+    const interval = setInterval(loadEmails, 20_000);
+    return () => clearInterval(interval);
+  }, [loadEmails]);
+
+  const openEmail = useCallback((mail: EmailLogEntry) => {
+    setSelectedEmail(mail);
+    setEmailDetail(null);
+    fetch(`/api/emails/${mail.id}`)
+      .then((r) => (r.ok ? r.json() : { data: null }))
+      .then((d) => {
+        if (d?.data) {
+          setEmailDetail({ html: d.data.html || "" });
+          setEmails((prev) =>
+            prev.map((e) => (e.id === mail.id ? { ...e, readAt: e.readAt || new Date().toISOString() } : e))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Transport
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -587,7 +655,127 @@ export function MessagesView({ role = "client" }: MessagesViewProps) {
         onToggleScreen={call.isSharingScreen ? call.stopScreenShare : call.startScreenShare}
       />
 
-      <div className="h-[calc(100vh-8rem)] flex rounded-[16px] border border-[#E2E0D9] overflow-hidden bg-white shadow-sm">
+      {/* ── Onglets Chat / Emails ─────────────────────── */}
+      <div className="flex items-center gap-1 mb-3 rounded-[12px] bg-[#F5F5F0] p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("chat")}
+          className={`flex items-center gap-1.5 rounded-[9px] px-4 py-2 text-[13px] font-semibold transition-colors ${
+            activeTab === "chat" ? "bg-white text-[#1A1916] shadow-sm" : "text-[#5A5750] hover:text-[#1A1916]"
+          }`}
+        >
+          💬 Messagerie
+          {conversations.some((c) => (c.unreadCount ?? 0) > 0) && (
+            <span className="h-2 w-2 rounded-full bg-[#2D5BE3]" />
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab("emails")}
+          className={`flex items-center gap-1.5 rounded-[9px] px-4 py-2 text-[13px] font-semibold transition-colors ${
+            activeTab === "emails" ? "bg-white text-[#1A1916] shadow-sm" : "text-[#5A5750] hover:text-[#1A1916]"
+          }`}
+        >
+          ✉️ Emails
+          {unreadEmailsCount > 0 && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#2D5BE3] px-1 text-[10px] font-bold text-white">
+              {unreadEmailsCount > 9 ? "9+" : unreadEmailsCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === "emails" ? (
+        <div className="h-[calc(100vh-11rem)] flex rounded-[16px] border border-[#E2E0D9] overflow-hidden bg-white shadow-sm">
+          {/* ── Liste des emails ── */}
+          <div className="w-80 border-r border-[#E2E0D9] flex flex-col bg-white shrink-0">
+            <div className="px-4 py-3.5 border-b border-[#E2E0D9]">
+              <h2 className="font-semibold text-[15px] text-[#1A1916]">Emails reçus</h2>
+              <p className="text-[12px] text-[#9C9A95] mt-0.5">Activation, offres, contrats, paiements…</p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {emailsLoading ? (
+                <div className="p-4 space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="animate-pulse h-16 rounded-[10px] bg-[#F5F5F0]" />
+                  ))}
+                </div>
+              ) : emails.length === 0 ? (
+                <div className="p-6 text-center">
+                  <p className="text-[32px] mb-2">✉️</p>
+                  <p className="text-[13px] font-medium text-[#1A1916]">Aucun email</p>
+                  <p className="mt-1 text-[12px] text-[#9C9A95] leading-snug">
+                    Vos notifications par email apparaîtront ici.
+                  </p>
+                </div>
+              ) : (
+                emails.map((mail) => (
+                  <button
+                    key={mail.id}
+                    onClick={() => openEmail(mail)}
+                    className={`w-full text-left p-3 border-b border-[#E2E0D9] last:border-b-0 transition-colors hover:bg-[#EEF2FD] ${
+                      selectedEmail?.id === mail.id ? "bg-[#EEF2FD]" : ""
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#EEF2FD] text-[15px]">
+                        {EMAIL_CATEGORY_ICONS[mail.category] ?? "🔔"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline justify-between gap-1">
+                          <p className={`text-[13px] truncate ${!mail.readAt ? "font-semibold text-[#1A1916]" : "font-medium text-[#5A5750]"}`}>
+                            {mail.subject}
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-[#9C9A95] mt-0.5 truncate">{mail.preview}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[10px] text-[#9C9A95]">{fmtEmailDate(mail.createdAt)}</span>
+                          {!mail.readAt && <span className="h-1.5 w-1.5 rounded-full bg-[#2D5BE3]" />}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* ── Détail de l'email sélectionné ── */}
+          <div className="flex-1 flex flex-col min-w-0 bg-[#FAFAF8]">
+            {selectedEmail ? (
+              <>
+                <div className="px-6 py-4 border-b border-[#E2E0D9] bg-white">
+                  <p className="text-[12px] text-[#9C9A95]">{fmtEmailDate(selectedEmail.createdAt)}</p>
+                  <h3 className="text-[17px] font-semibold text-[#1A1916] mt-1">{selectedEmail.subject}</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {emailDetail ? (
+                    <div
+                      className="rounded-[12px] bg-white border border-[#E2E0D9] p-6 shadow-sm"
+                      dangerouslySetInnerHTML={{ __html: emailDetail.html }}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#2D5BE3] border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center px-8">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[20px] bg-[#EEF2FD]">
+                    <span className="text-[32px]">✉️</span>
+                  </div>
+                  <p className="text-[15px] font-semibold text-[#1A1916]">Sélectionnez un email</p>
+                  <p className="mt-1.5 text-[13px] text-[#5A5750] leading-snug">
+                    Consultez l&apos;historique de vos notifications par email
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+      <div className="h-[calc(100vh-11rem)] flex rounded-[16px] border border-[#E2E0D9] overflow-hidden bg-white shadow-sm">
 
         {/* ── Colonne gauche : liste des conversations ── */}
         <div className="w-72 border-r border-[#E2E0D9] flex flex-col bg-white shrink-0">
@@ -825,6 +1013,7 @@ export function MessagesView({ role = "client" }: MessagesViewProps) {
           </div>
         )}
       </div>
+      )}
     </>
   );
 }

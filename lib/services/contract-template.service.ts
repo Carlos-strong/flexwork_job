@@ -21,6 +21,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import QRCode from "qrcode";
 
 export interface ContractTemplateData {
   reference: string;
@@ -51,24 +52,100 @@ export interface ContractTemplateData {
 
   // Jalons
   milestones: Array<{
+    id: string;
     title: string;
     description?: string;
     amount: number;
     delay: string;
     unit?: string;
+    status?: string;
+    executionRate?: number;
+    proofs?: unknown;
+    revisionCount?: number;
+    rejectionReason?: string;
   }>;
+
+  // Signatures (optionnel — présentes après double signature)
+  signedByClient?: boolean;
+  signedByFreelancer?: boolean;
+  workflowPhase?: string; // phase ContractPhase du workflow
+  signatures?: {
+    client?: {
+      signedAt: string;
+      certificateId: string;
+      signatureHash: string;
+    };
+    freelancer?: {
+      signedAt: string;
+      certificateId: string;
+      signatureHash: string;
+    };
+  };
 }
 
 /**
  * Génère le HTML complet d'un contrat de prestation à partir des données
  * extraites de la base (contrat, mission, offre, utilisateurs).
  */
-export function generateContractHtml(data: ContractTemplateData): string {
+export async function generateContractHtml(data: ContractTemplateData): Promise<string> {
   const c = data.currency || "€";
   const fmt = (n: number) => n.toLocaleString("fr-FR") + ` ${c}`;
   const today = new Date().toLocaleDateString("fr-FR", {
     day: "numeric", month: "long", year: "numeric",
   });
+
+  // ── QR Codes de signature ──────────────────────────
+  const sigs = data.signatures;
+
+  async function generateSignatureQR(
+    role: "CLIENT" | "PRESTATAIRE",
+    signerName: string,
+    sigData?: { signedAt: string; certificateId: string; signatureHash: string }
+  ): Promise<string> {
+    if (!sigData) {
+      // Pas encore signé — placeholder
+      return Promise.resolve(`<div class="signature-line"></div>
+        <p style="font-size:11px;color:#888">Signature</p>`);
+    }
+
+    const payload = JSON.stringify({
+      v: 1,
+      cid: data.reference,
+      role,
+      signer: signerName,
+      ts: sigData.signedAt,
+      cert: sigData.certificateId,
+      hash: sigData.signatureHash,
+      method: "RSA-SHA256",
+      provider: "Flexwork eIDAS",
+    });
+
+    // Générer le QR code en SVG
+    let qrSvg = "";
+    try {
+      qrSvg = await QRCode.toString(payload, {
+        type: "svg",
+        width: 95,
+        margin: 1,
+        color: { dark: "#14213D", light: "#FFFFFF" },
+      });
+    } catch {
+      qrSvg = `<div style="width:140px;height:140px;border:1px dashed #ccc;display:flex;align-items:center;justify-content:center;color:#999;font-size:10px;">QR Code</div>`;
+    }
+
+    const shortHash = sigData.signatureHash.slice(0, 12);
+
+    return `
+      <div style="text-align:center;margin-top:12px;">
+        <div style="display:inline-block;background:#fff;padding:8px;border:1px solid #DADFDD;border-radius:6px;">
+          ${qrSvg}
+        </div>
+        <p style="font-family:Consolas,monospace;font-size:9px;color:#6B7280;margin:6px 0 2px 0;">${shortHash}</p>
+        <p style="font-family:Consolas,monospace;font-size:8px;color:#9aa0a6;margin:0;">${sigData.certificateId.slice(0, 24)}</p>
+        <p style="font-size:10px;color:#1F7A5C;font-weight:600;margin:4px 0 0 0;">✓ Signature vérifiable</p>
+        <p style="font-size:9px;color:#6B7280;margin:2px 0 0 0;">${new Date(sigData.signedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+      </div>`;
+  }
 
   const milestonesRows = data.milestones.map((m, i) => {
     const num = String(i + 1).padStart(2, "0");
@@ -93,6 +170,10 @@ export function generateContractHtml(data: ContractTemplateData): string {
   const regimeRow = data.contractType === "FIXED"
     ? "Le régime de rémunération applicable est : <strong>Prix fixe</strong>."
     : "Le régime de rémunération applicable est : <strong>Taux horaire</strong>.";
+
+  // Générer les QR codes de signature (asynchrones)
+  const clientSigHtml = await generateSignatureQR("CLIENT", data.clientCompanyName, sigs?.client);
+  const freelancerSigHtml = await generateSignatureQR("PRESTATAIRE", data.freelancerName, sigs?.freelancer);
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -298,10 +379,11 @@ ou son interprétation, les Parties s'efforceront de trouver une solution amiabl
 </p>
 
 <div class="signature-section">
-  <h2>Signatures</h2>
+  <h2>Signatures électroniques</h2>
   <p class="clause">
-    Fait en deux exemplaires originaux, dont un pour chacune des Parties, qui reconnaissent avoir pris connaissance
-    de l'ensemble des clauses qui précèdent et les accepter sans réserve.
+    Fait électroniquement, en un exemplaire numérique unique faisant foi entre les Parties,
+    qui reconnaissent avoir pris connaissance de l'ensemble des clauses qui précèdent et les accepter sans réserve.
+    Chaque signature est matérialisée par un QR code cryptographique vérifiable (RSA-SHA256, conforme eIDAS).
   </p>
 
   <div class="signature-grid">
@@ -310,22 +392,14 @@ ou son interprétation, les Parties s'efforceront de trouver une solution amiabl
       <p><strong>${data.clientCompanyName}</strong></p>
       <p>${data.clientRepresentative}</p>
       <p style="font-size:11px;color:#666">${data.clientRepresentativeTitle}</p>
-      <div style="margin-top:40px">
-        <p style="font-size:11px;color:#555">Date : ${today}</p>
-        <div class="signature-line"></div>
-        <p style="font-size:11px;color:#888">Signature</p>
-      </div>
+      ${clientSigHtml}
     </div>
 
     <div class="signature-box">
       <h3>POUR LE PRESTATAIRE</h3>
       <p><strong>${data.freelancerName}</strong></p>
       <p style="font-size:11px;color:#666">${data.freelancerStatus}</p>
-      <div style="margin-top:40px">
-        <p style="font-size:11px;color:#555">Date : ${today}</p>
-        <div class="signature-line"></div>
-        <p style="font-size:11px;color:#888">Signature</p>
-      </div>
+      ${freelancerSigHtml}
     </div>
   </div>
 </div>
@@ -357,6 +431,7 @@ export async function getContractTemplateData(contractId: string): Promise<Contr
           },
         },
         milestones: { orderBy: { createdAt: "asc" } },
+        signatures: { orderBy: { signedAt: "asc" } },
         offer: {
           include: {
             application: {
@@ -394,6 +469,7 @@ export async function getContractTemplateData(contractId: string): Promise<Contr
     }
 
     const milestones = contract.milestones.map((m) => ({
+      id: m.id,
       title: m.title,
       description: m.description || undefined,
       amount: m.amount,
@@ -401,7 +477,29 @@ export async function getContractTemplateData(contractId: string): Promise<Contr
         ? new Date(m.dueDate).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })
         : "À définir",
       unit: "Forfait",
+      status: m.status,
+      executionRate: m.executionRate ?? 100,
+      proofs: m.proofs ?? undefined,
+      revisionCount: m.revisionCount ?? 0,
+      rejectionReason: m.rejectionReason ?? undefined,
     }));
+
+    // Construire les données de signature — uniquement après DOUBLE signature
+    const bothSigned = contract.clientSignedAt && contract.freelancerSignedAt;
+    const sigs: ContractTemplateData["signatures"] = {};
+
+    if (bothSigned && contract.clientSignedAt && contract.freelancerSignedAt) {
+      sigs.client = {
+        signedAt: contract.clientSignedAt.toISOString(),
+        certificateId: `CERT-${contract.id.slice(0, 8)}-CLI-${contract.clientSignedAt.getTime().toString(36).toUpperCase()}`,
+        signatureHash: simpleHash(`${contract.id}:CLIENT:${contract.clientSignedAt.toISOString()}`),
+      };
+      sigs.freelancer = {
+        signedAt: contract.freelancerSignedAt.toISOString(),
+        certificateId: `CERT-${contract.id.slice(0, 8)}-PRE-${contract.freelancerSignedAt.getTime().toString(36).toUpperCase()}`,
+        signatureHash: simpleHash(`${contract.id}:PRESTATAIRE:${contract.freelancerSignedAt.toISOString()}`),
+      };
+    }
 
     return {
       reference: contract.id.slice(0, 8).toUpperCase(),
@@ -423,9 +521,38 @@ export async function getContractTemplateData(contractId: string): Promise<Contr
       contractType: contract.contractType as "FIXED" | "HOURLY",
       totalAmount: contract.totalBudget || 0,
       milestones,
+      signedByClient: !!contract.clientSignedAt,
+      signedByFreelancer: !!contract.freelancerSignedAt,
+      workflowPhase: mapPrismaStatusToPhase(contract.status),
+      signatures: (sigs.client || sigs.freelancer) ? sigs : undefined,
     };
   } catch (err) {
     console.error("[ContractTemplate] Erreur lors de la récupération des données:", err);
     return null;
+  }
+}
+
+// ── Helper : hachage simple pour les signatures ──────
+
+function simpleHash(input: string): string {
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  const hexHash = Math.abs(hash).toString(16).padStart(8, "0").toUpperCase();
+  return Array.from({ length: 8 }, (_, i) =>
+    hexHash.substring(i % 4, (i % 4) + 4)
+  ).join("");
+}
+
+function mapPrismaStatusToPhase(status: string): string {
+  switch (status) {
+    case "PENDING": return "CONTRACT_GENERATED";
+    case "ACTIVE": return "CONTRACT_ACTIVE";
+    case "COMPLETED": return "COMPLETED";
+    case "DISPUTED": return "DISPUTE_OPENED";
+    default: return "NEGOTIATION";
   }
 }

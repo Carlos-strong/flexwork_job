@@ -4,11 +4,19 @@ import {
   apiSuccess,
   apiError,
   parseBody,
+  type ApiContext,
 } from "@/lib/api-gateway";
 import { enqueueJob } from "@/lib/queue";
 import { milestones, persistMockStore } from "@/lib/mock-data";
 import { prisma } from "@/lib/prisma";
 import { syncStore } from "@/lib/sync-store";
+import { checkContractAccess, type ContractRole } from "@/lib/contract-access";
+
+/** Vérifie que l'appelant est bien partie au contrat (défense en profondeur). */
+async function assertParty(ctx: ApiContext, requiredRole?: ContractRole) {
+  const userId = (ctx.session as { user?: { id?: string } } | null)?.user?.id;
+  return checkContractAccess(ctx.params.id, userId, requiredRole);
+}
 
 interface Milestone {
   id: string; title: string; description: string; amount: number;
@@ -44,7 +52,11 @@ export const GET = createApiHandler({
 // ── POST /api/contracts/[id]/milestones ───────
 export const POST = createApiHandler({
   methods: ["POST"],
-  async handler(req: NextRequest, ctx: { params: Record<string, string> }) {
+  requireRole: "FREELANCER",
+  async handler(req: NextRequest, ctx: ApiContext) {
+    const access = await assertParty(ctx, "freelancer");
+    if (!access.ok) return apiError(access.error, access.status);
+
     const body = await parseBody<{ title?: string; amount?: number }>(req);
     if (!body.title || !body.amount) {
       return apiError("Titre et montant requis", 400);
@@ -77,7 +89,11 @@ export const POST = createApiHandler({
 // ── PUT /api/contracts/[id]/milestones ────────
 export const PUT = createApiHandler({
   methods: ["PUT"],
-  async handler(req: NextRequest, ctx: { params: Record<string, string> }) {
+  requireRole: "CLIENT",
+  async handler(req: NextRequest, ctx: ApiContext) {
+    const access = await assertParty(ctx, "client");
+    if (!access.ok) return apiError(access.error, access.status);
+
     const body = await parseBody<{
       milestoneId?: string;
       status?: string;

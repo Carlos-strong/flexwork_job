@@ -65,6 +65,55 @@ export interface EmailPayload {
   cc?: string;
   bcc?: string;
   attachments?: { filename: string; content: Buffer | string }[];
+  /** Catégorie utilisée pour le filtrage dans l'onglet "Emails" de la messagerie */
+  category?: "verification" | "application" | "contract" | "payment" | "mission" | "offer" | "system";
+  /** userId explicite si connu (sinon résolu par email via `to`) */
+  userId?: string;
+}
+
+// ============================================================
+// Journalisation — historique consultable dans l'onglet "Emails"
+// ============================================================
+
+/** Devine une catégorie à partir du sujet quand elle n'est pas fournie explicitement */
+function inferCategory(subject: string): NonNullable<EmailPayload["category"]> {
+  const s = subject.toLowerCase();
+  if (s.includes("activ") || s.includes("vérif") || s.includes("mot de passe") || s.includes("réinitialis")) return "verification";
+  if (s.includes("candidature") || s.includes("consult")) return "application";
+  if (s.includes("offre")) return "offer";
+  if (s.includes("contrat") || s.includes("jalon") || s.includes("litige") || s.includes("actif")) return "contract";
+  if (s.includes("paiement") || s.includes("libéré") || s.includes("reçu") && s.includes("€")) return "payment";
+  if (s.includes("mission")) return "mission";
+  return "system";
+}
+
+async function logEmail(payload: EmailPayload, status: "SENT" | "FAILED") {
+  try {
+    // Import différé pour éviter les cycles et ne pas charger Prisma inutilement
+    const { prisma } = await import("./prisma");
+    let userId = payload.userId ?? null;
+    if (!userId) {
+      const recipient = payload.to.split(",")[0]?.trim();
+      if (recipient) {
+        const user = await prisma.user.findUnique({ where: { email: recipient }, select: { id: true } });
+        userId = user?.id ?? null;
+      }
+    }
+    const preview = payload.html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+    await prisma.emailLog.create({
+      data: {
+        userId,
+        to: payload.to,
+        subject: payload.subject,
+        category: payload.category || inferCategory(payload.subject),
+        preview,
+        html: payload.html,
+        status,
+      },
+    });
+  } catch {
+    // Non bloquant — l'historique en base est secondaire à l'envoi réel
+  }
 }
 
 // ============================================================
@@ -85,10 +134,12 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
     });
 
     console.log(`[Email] ✅ Envoyé à ${payload.to} — sujet: "${payload.subject}" (${info.messageId})`);
+    void logEmail(payload, "SENT");
     return { success: true, messageId: info.messageId };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erreur inconnue";
     console.error(`[Email] ❌ Échec pour ${payload.to}: ${message}`);
+    void logEmail(payload, "FAILED");
     return { success: false, error: message };
   }
 }

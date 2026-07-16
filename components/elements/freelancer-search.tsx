@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useUrlFilters } from "@/hooks/use-url-filters";
+import { useScrollRestore } from "@/hooks/use-scroll-restore";
 
 interface Freelancer {
   id: string;
@@ -24,9 +26,15 @@ interface FreelancerSearchProps {
 export function FreelancerSearch({ basePath = "/dashboard/client" }: FreelancerSearchProps) {
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [skillFilter, setSkillFilter] = useState("");
-  const [maxRate, setMaxRate] = useState("");
+  const { filters, setFilter, clearFilters } = useUrlFilters<{
+    search?: string;
+    skill?: string;
+    maxRate?: string;
+  }>();
+  const { search = "", skill: skillFilter = "", maxRate = "" } = filters;
+
+  // Restaurer la position de scroll au retour (plan5.md §7)
+  useScrollRestore("client-freelancer-search", { mode: "page" });
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -39,6 +47,8 @@ export function FreelancerSearch({ basePath = "/dashboard/client" }: FreelancerS
       .then((data) => { setFreelancers(data); setLoading(false); });
   }, [search, skillFilter, maxRate]);
 
+  const hasFilters = search || skillFilter || maxRate;
+
   return (
     <div>
       {/* Filtres */}
@@ -46,24 +56,32 @@ export function FreelancerSearch({ basePath = "/dashboard/client" }: FreelancerS
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setFilter("search", e.target.value)}
           placeholder="Rechercher par nom ou compétence..."
           className="flex-1 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
         />
         <input
           type="text"
           value={skillFilter}
-          onChange={(e) => setSkillFilter(e.target.value)}
+          onChange={(e) => setFilter("skill", e.target.value)}
           placeholder="Filtrer par compétence"
           className="w-full sm:w-48 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
         />
         <input
           type="number"
           value={maxRate}
-          onChange={(e) => setMaxRate(e.target.value)}
+          onChange={(e) => setFilter("maxRate", e.target.value)}
           placeholder="TJM max (€)"
           className="w-full sm:w-40 rounded-lg border border-[#E2E0D9] bg-white px-4 py-2.5 text-sm"
         />
+        {hasFilters && (
+          <button
+            onClick={clearFilters}
+            className="rounded-lg border border-[#E2E0D9] bg-white px-3 py-2.5 text-xs text-[#5A5750] hover:bg-[#F5F5F0] transition-colors whitespace-nowrap"
+          >
+            ✕ Effacer
+          </button>
+        )}
       </div>
 
       {loading ? (

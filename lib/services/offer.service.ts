@@ -317,7 +317,7 @@ export class OfferService {
       const { getContractTemplateData, generateContractHtml } = await import("./contract-template.service");
       const templateData = await getContractTemplateData(result.contract.id);
       if (templateData) {
-        const html = generateContractHtml(templateData);
+        const html = await generateContractHtml(templateData);
         const documentPath = `contracts/${result.contract.id}/contrat.html`;
         const fs = await import("fs");
         const path = await import("path");
@@ -393,10 +393,18 @@ export class OfferService {
         milestones: milestonesForEscrow,
       });
 
+      // L'escrow financé amène le contrat en phase FUNDED (statut Prisma PENDING) —
+      // PAS en ACTIVE : la double signature (client + freelance) reste requise pour
+      // activer le contrat (garde canActivateContract dans lib/contract-workflow.ts).
+      // Passer status="ACTIVE" ici court-circuiterait cette garde car resolvePhase()
+      // dérive la phase depuis workflowPhase en priorité, mais retombe sur le statut
+      // Prisma brut ("ACTIVE" → CONTRACT_ACTIVE) tant qu'aucune intention de workflow
+      // n'a encore persisté workflowPhase.
       activeContract = await prisma.contract.update({
         where: { id: result.contract.id },
         data: {
-          status: "ACTIVE",
+          status: "PENDING",
+          workflowPhase: "FUNDED",
           escrowId: escrowResult.trustEngineEscrowId,
           escrowAmount: offer.totalBudget || 0,
         },

@@ -6,6 +6,7 @@ import { LogoutButton } from "@/components/layout/logout-button";
 import { ProfileSwitcher } from "@/components/layout/profile-switcher";
 import { EmailVerificationBanner } from "@/components/layout/email-verification-banner";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
+import { FloatingChatBubble } from "@/lib/dynamic-imports";
 import { prisma } from "@/lib/prisma";
 
 // Requête Prisma mise en cache 5 minutes par userId — évite un aller-retour BDD à chaque navigation
@@ -28,14 +29,11 @@ const clientNav = [
   { href: "/dashboard/client/missions/creation", label: "Créer une mission", icon: "➕" },
   { href: "/dashboard/client/missions", label: "Mes missions", icon: "📋" },
   { href: "/dashboard/client/candidatures", label: "Candidatures", icon: "📩" },
-  { href: "/dashboard/client/missions/archives", label: "Archives", icon: "📦" },
-  { href: "/dashboard/client/freelancers", label: "Freelances", icon: "🔍" },
-  { href: "/dashboard/client/contrats", label: "Contrats", icon: "📝" },
-  { href: "/dashboard/client/contrats/offres", label: "  └ Offres", icon: "📨" },
+  { href: "/dashboard/client/offres", label: "Offres", icon: "📨" },
   { href: "/dashboard/client/messages", label: "Messages", icon: "💬" },
   { href: "/dashboard/client/paiements", label: "Paiements", icon: "💳" },
   { href: "/dashboard/client/entreprise", label: "Entreprise", icon: "🏢" },
-  { href: "/dashboard/client/avis", label: "Avis donnés", icon: "⭐" },
+  { href: "/dashboard/client/avis", label: "Avis", icon: "⭐" },
 ];
 
 // ── Navigation Freelance ───────────────────────
@@ -43,12 +41,11 @@ const freelancerNav = [
   { href: "/dashboard/freelancer", label: "Dashboard", icon: "📊" },
   { href: "/dashboard/freelancer/recherche", label: "Missions", icon: "🔍" },
   { href: "/dashboard/freelancer/candidatures", label: "Candidatures", icon: "📩" },
-  { href: "/dashboard/freelancer/contrats", label: "Contrats", icon: "📝" },
-  { href: "/dashboard/freelancer/contrats/offres", label: "  └ Offres", icon: "📨" },
+  { href: "/dashboard/freelancer/offres", label: "Offres", icon: "📨" },
   { href: "/dashboard/freelancer/profil", label: "Profil pro", icon: "👤" },
   { href: "/dashboard/freelancer/messages", label: "Messages", icon: "💬" },
   { href: "/dashboard/freelancer/paiements", label: "Paiements", icon: "💳" },
-  { href: "/dashboard/freelancer/avis", label: "Avis reçus", icon: "⭐" },
+  { href: "/dashboard/freelancer/avis", label: "Avis", icon: "⭐" },
 ];
 
 export default async function DashboardLayout({
@@ -138,6 +135,9 @@ export default async function DashboardLayout({
           </main>
         </div>
       </div>
+
+      {/* Bulle de chat flottante — accessible depuis toutes les pages du dashboard */}
+      <FloatingChatBubble />
     </div>
   );
 }

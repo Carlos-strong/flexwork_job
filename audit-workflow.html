@@ -1,0 +1,514 @@
+<title>Audit du workflow — Flexwork</title>
+<style>
+  :root{
+    --bg:#f4f5f2;
+    --surface:#ffffff;
+    --surface-2:#eceee8;
+    --ink:#181b16;
+    --ink-soft:#54584e;
+    --ink-faint:#8a8e82;
+    --border:#dcded4;
+    --border-strong:#c5c8ba;
+    --accent:#28466e;
+    --accent-soft:#e7ecf3;
+    --good:#2f7d4f;
+    --good-soft:#e5f2e9;
+    --warn:#a5701a;
+    --warn-soft:#faf0dd;
+    --bad:#af3a34;
+    --bad-soft:#fbe9e7;
+    --crit:#7a2331;
+    --crit-soft:#f6e3e2;
+    --code-bg:#eef0e8;
+    --shadow: 0 1px 2px rgba(20,22,16,0.04), 0 8px 24px -12px rgba(20,22,16,0.12);
+  }
+  :root[data-theme="dark"]{
+    --bg:#14161b;
+    --surface:#1b1e24;
+    --surface-2:#22262d;
+    --ink:#e9ebe4;
+    --ink-soft:#a8ac9f;
+    --ink-faint:#71756a;
+    --border:#2c313a;
+    --border-strong:#3a404b;
+    --accent:#8fb4e6;
+    --accent-soft:#20293a;
+    --good:#6bc492;
+    --good-soft:#132a1e;
+    --warn:#e0aa4f;
+    --warn-soft:#2e2416;
+    --bad:#e08581;
+    --bad-soft:#301a19;
+    --crit:#f3a2a0;
+    --crit-soft:#3a1a1e;
+    --code-bg:#20242b;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14161b;
+      --surface:#1b1e24;
+      --surface-2:#22262d;
+      --ink:#e9ebe4;
+      --ink-soft:#a8ac9f;
+      --ink-faint:#71756a;
+      --border:#2c313a;
+      --border-strong:#3a404b;
+      --accent:#8fb4e6;
+      --accent-soft:#20293a;
+      --good:#6bc492;
+      --good-soft:#132a1e;
+      --warn:#e0aa4f;
+      --warn-soft:#2e2416;
+      --bad:#e08581;
+      --bad-soft:#301a19;
+      --crit:#f3a2a0;
+      --crit-soft:#3a1a1e;
+      --code-bg:#20242b;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
+    }
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent-soft); }
+
+  .display{
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", ui-serif, serif;
+  }
+  code, .mono, .tabular{
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .wrap{ max-width: 980px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ── Header ───────────────────────────────── */
+  header.top{
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--surface-2), var(--bg));
+  }
+  header.top .inner{ max-width:980px; margin:0 auto; padding: 44px 24px 32px; }
+  .eyebrow{
+    font-size:12.5px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--accent); font-weight:700; margin:0 0 10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .eyebrow .dot{ width:6px;height:6px;border-radius:50%;background:var(--accent); }
+  h1.title{
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 10px;
+    text-wrap: balance;
+    font-weight: 700;
+    letter-spacing:-0.01em;
+  }
+  .subtitle{ color:var(--ink-soft); font-size:16px; max-width:62ch; margin:0 0 22px; }
+  .meta-row{ display:flex; flex-wrap:wrap; gap:10px 22px; font-size:13px; color:var(--ink-faint); }
+  .meta-row b{ color:var(--ink-soft); font-weight:600; }
+
+  /* ── Nav chips ────────────────────────────── */
+  nav.toc{
+    display:flex; flex-wrap:wrap; gap:8px;
+    padding: 14px 0 0;
+  }
+  nav.toc a{
+    font-size:12.5px; color:var(--ink-soft); text-decoration:none;
+    border:1px solid var(--border); border-radius:999px;
+    padding:6px 12px; white-space:nowrap;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  nav.toc a:hover{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+
+  section{ padding: 46px 0; border-bottom:1px solid var(--border); }
+  section:last-of-type{ border-bottom:none; }
+  h2.h{
+    font-size: 22px; margin:0 0 6px; letter-spacing:-0.01em; font-weight:700;
+    display:flex; align-items:baseline; gap:10px;
+  }
+  h2.h .num{ color:var(--ink-faint); font-weight:500; font-size:14px; }
+  .section-lede{ color:var(--ink-soft); max-width:70ch; font-size:15px; margin: 4px 0 26px; }
+
+  /* ── Stat tiles ───────────────────────────── */
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  @media (max-width:720px){ .stats{ grid-template-columns:repeat(2,1fr); } }
+  .stat{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:16px 16px 14px; box-shadow:var(--shadow);
+  }
+  .stat .n{ font-size:26px; font-weight:700; font-family: ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  .stat .l{ font-size:12.5px; color:var(--ink-soft); margin-top:2px; }
+  .stat.crit .n{ color:var(--crit); }
+  .stat.warn .n{ color:var(--warn); }
+  .stat.good .n{ color:var(--good); }
+
+  /* ── Callout / banner ─────────────────────── */
+  .banner{
+    border-radius:14px; padding:20px 22px; margin: 26px 0 0;
+    border:1px solid var(--border-strong);
+    background:var(--surface);
+    box-shadow:var(--shadow);
+    position:relative;
+    overflow:hidden;
+  }
+  .banner::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:5px;
+  }
+  .banner.crit::before{ background:var(--crit); }
+  .banner.warn::before{ background:var(--warn); }
+  .banner h3{ margin:0 0 6px; font-size:16px; padding-left:8px; }
+  .banner p{ margin:0; padding-left:8px; color:var(--ink-soft); font-size:14.5px; }
+
+  /* ── Pills ────────────────────────────────── */
+  .pill{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11.5px; font-weight:700; letter-spacing:.02em;
+    padding:3px 9px; border-radius:999px; text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .pill.ok{ background:var(--good-soft); color:var(--good); }
+  .pill.partial{ background:var(--warn-soft); color:var(--warn); }
+  .pill.missing{ background:var(--bad-soft); color:var(--bad); }
+  .pill.crit{ background:var(--crit-soft); color:var(--crit); }
+  .pill.high{ background:var(--bad-soft); color:var(--bad); }
+  .pill.medium{ background:var(--warn-soft); color:var(--warn); }
+  .pill.info{ background:var(--accent-soft); color:var(--accent); }
+
+  /* ── Flow diagram ─────────────────────────── */
+  .flow{
+    display:flex; flex-direction:column; gap:0; align-items:stretch;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding: 26px 22px; box-shadow:var(--shadow); overflow-x:auto;
+  }
+  .flow-node{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:12px 16px; border:1px solid var(--border); border-radius:10px;
+    background:var(--surface-2); min-width:560px;
+  }
+  .flow-node .label{ font-size:14px; font-weight:600; }
+  .flow-node .route{ font-size:11.5px; color:var(--ink-faint); }
+  .flow-arrow{
+    display:flex; justify-content:center; padding:4px 0; color:var(--ink-faint); font-size:13px;
+    min-width:560px;
+  }
+  .flow-branch{
+    display:flex; gap:14px; min-width:560px; padding: 6px 0;
+  }
+  .flow-branch .flow-node{ flex:1; min-width:0; }
+  .branch-label{
+    font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint);
+    text-align:center; padding-bottom:4px;
+  }
+
+  /* ── Tables ───────────────────────────────── */
+  .table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow); background:var(--surface); }
+  table{ border-collapse:collapse; width:100%; font-size:13.5px; min-width:640px; }
+  thead th{
+    text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--ink-faint); font-weight:700; padding:12px 14px; background:var(--surface-2);
+    border-bottom:1px solid var(--border); position:sticky; top:0;
+  }
+  tbody td{ padding:12px 14px; border-bottom:1px solid var(--border); vertical-align:top; }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody tr:hover{ background:var(--surface-2); }
+  td.route, td.evidence{ font-family:ui-monospace,monospace; font-size:12px; color:var(--ink-soft); }
+  td.evidence{ color:var(--accent); }
+
+  /* ── Finding cards ────────────────────────── */
+  .finding{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:22px; margin-bottom:16px; box-shadow:var(--shadow); position:relative;
+  }
+  .finding.crit{ border-left:4px solid var(--crit); }
+  .finding.high{ border-left:4px solid var(--bad); }
+  .finding.medium{ border-left:4px solid var(--warn); }
+  .finding-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .finding-head h3{ margin:0; font-size:16.5px; font-weight:700; }
+  .finding p{ margin: 8px 0; font-size:14.5px; color:var(--ink-soft); }
+  .finding p strong{ color:var(--ink); }
+  .evidence-block{
+    background:var(--code-bg); border:1px solid var(--border); border-radius:8px;
+    padding:10px 13px; font-family:ui-monospace,monospace; font-size:12px;
+    color:var(--ink-soft); margin:10px 0; overflow-x:auto; white-space:pre;
+  }
+  .fix-block{
+    background:var(--good-soft); border:1px solid var(--border); border-radius:8px;
+    padding:10px 13px; font-size:13.5px; color:var(--good); margin-top:10px;
+  }
+  .fix-block b{ color:var(--good); }
+
+  /* ── Roadmap ──────────────────────────────── */
+  .roadmap{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  @media (max-width:720px){ .roadmap{ grid-template-columns:1fr; } }
+  .rcol{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:20px; box-shadow:var(--shadow); }
+  .rcol h4{ margin:0 0 4px; font-size:14.5px; }
+  .rcol .hint{ font-size:12px; color:var(--ink-faint); margin-bottom:14px; }
+  .rcol ol{ margin:0; padding-left:20px; display:flex; flex-direction:column; gap:10px; }
+  .rcol li{ font-size:13.5px; color:var(--ink-soft); }
+  .rcol li strong{ color:var(--ink); }
+
+  footer{ padding: 32px 0 8px; color:var(--ink-faint); font-size:12.5px; text-align:center; }
+
+  @media (prefers-reduced-motion: no-preference){
+    section{ }
+  }
+</style>
+
+<header class="top">
+  <div class="inner">
+    <p class="eyebrow"><span class="dot"></span>Audit technique — correctifs appliqués</p>
+    <h1 class="title display">Audit du workflow implémenté — Flexwork</h1>
+    <p class="subtitle">État réel du parcours mission → candidature → offre → contrat → jalons → litige → clôture, vérifié directement dans le code. <b>Mise à jour du 16 juillet 2026 : tous les points identifiés ont été corrigés</b> — réarchitecture serveur-autoritaire, sécurisation des routes, et comblement des trois lacunes fonctionnelles.</p>
+    <div class="meta-row">
+      <span><b>Date</b> 16 juillet 2026</span>
+      <span><b>Branche</b> main</span>
+      <span><b>Statut</b> <span class="pill ok" style="vertical-align:middle">Corrigé</span></span>
+      <span><b>Vérif.</b> 354 tests ✓ · typecheck propre</span>
+    </div>
+    <nav class="toc">
+      <a href="#synthese">Synthèse</a>
+      <a href="#carte">Carte du parcours</a>
+      <a href="#matrice">Matrice par étape</a>
+      <a href="#securite">Failles de sécurité</a>
+      <a href="#lacunes">Lacunes fonctionnelles</a>
+      <a href="#tests">Couverture de tests</a>
+      <a href="#plan">Plan d'action</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ═══════════════════ SYNTHÈSE ═══════════════════ -->
+  <section id="synthese">
+    <h2 class="h"><span class="num">01</span>Synthèse</h2>
+    <p class="section-lede">Le parcours métier était largement implémenté, mais sa logique n'était appliquée que <strong>côté client</strong> : les routes API persistaient l'état sans authentifier l'appelant ni revalider les règles. <b>C'est désormais corrigé</b> — le serveur est la source de vérité, les trois routes sont sécurisées, et les trois lacunes fonctionnelles (récap frais, avis, retrait) sont comblées.</p>
+
+    <div class="stats">
+      <div class="stat good">
+        <div class="n">13 / 13</div>
+        <div class="l">Étapes du parcours implémentées (avis + retrait ajoutés)</div>
+      </div>
+      <div class="stat good">
+        <div class="n">3 / 3</div>
+        <div class="l">Routes de mutation désormais authentifiées + revalidées serveur</div>
+      </div>
+      <div class="stat good">
+        <div class="n">354</div>
+        <div class="l">Tests au vert, dont 9 nouveaux cas d'accès non autorisé (401/403)</div>
+      </div>
+      <div class="stat good">
+        <div class="n">0</div>
+        <div class="l">Erreur de typecheck — client Prisma régénéré + schéma appliqué</div>
+      </div>
+    </div>
+
+    <div class="banner">
+      <h3 style="padding-left:8px">✅ Constat central — résolu</h3>
+      <p>Le point de mutation d'état est désormais <strong>intent-based et autoritaire</strong> : le front envoie des intentions (<code>SIGN</code>, <code>ADVANCE_PHASE</code>, <code>SUBMIT/VALIDATE/REJECT_MILESTONE</code>, <code>ADVANCE_DISPUTE</code>) ; le serveur authentifie l'appelant, vérifie son appartenance au contrat et son rôle, rejoue la transition via la machine à états (<code>lib/services/contract-workflow.service.ts</code>), puis persiste. Les garde-fous (double signature, 100 % validé avant clôture, preuve d'appel, seuil d'arbitrage) ne sont <strong>plus contournables par un appel API direct</strong>. Bonus : un bug latent a été corrigé (le <code>revisionCount</code> n'était pas incrémenté au rejet → le litige ne se serait jamais déclenché), et la phase exacte est maintenant persistée (<code>workflowPhase</code>) pour survivre au reload.</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CARTE DU PARCOURS ═══════════════════ -->
+  <section id="carte">
+    <h2 class="h"><span class="num">02</span>Carte du parcours implémenté</h2>
+    <p class="section-lede">Le litige n'est pas une page séparée : c'est une bifurcation qui se déclenche automatiquement depuis la boucle jalons dès que le seuil de rejets est dépassé, reste dans le même hub de pilotage, puis rejoint la clôture avec un montant potentiellement différent.</p>
+
+    <div class="flow">
+      <div class="flow-node"><span class="label">A · Publier une mission <span class="pill ok">Fait</span></span><span class="route">/dashboard/client/missions/creation</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">B–C · Fil des missions → candidature <span class="pill ok">Fait</span></span><span class="route">/dashboard/freelancer/recherche</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">D · Sélection d'une candidature <span class="pill ok">Fait</span></span><span class="route">/dashboard/client/candidatures</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Messagerie + appels audio/vidéo <span class="pill ok">Fait</span></span><span class="route">WebSocket + WebRTC, bulle flottante</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Offre formelle → négociation (max 3 tours) <span class="pill ok">Fait</span></span><span class="route">lib/services/offer.service.ts</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Financement escrow → double signature RSA <span class="pill ok">Fait</span></span><span class="route">/dashboard/pilotage/[contractId] — FUNDED</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Hub de pilotage — boucle jalons ⇄ validation <span class="pill ok">Fait</span></span><span class="route">CONTRACT_ACTIVE — client/freelancer-detail.tsx</span></div>
+      <div class="flow-arrow">↓ tous les jalons validés · · · · seuil de 5 rejets dépassé ↓</div>
+      <div class="flow-branch">
+        <div>
+          <div class="branch-label">Chemin normal</div>
+          <div class="flow-node"><span class="label">Clôture — paiement intégral <span class="pill ok">Fait</span></span><span class="route">PhaseClosing</span></div>
+        </div>
+        <div>
+          <div class="branch-label">Chemin litige</div>
+          <div class="flow-node"><span class="label">Purge → prorata → appel 48h → médiation → arbitrage <span class="pill ok">Fait</span></span><span class="route">PhaseDispute (page à onglets)</span></div>
+        </div>
+      </div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Frais de plateforme (commission 5%) <span class="pill partial">Partiel</span></span><span class="route">calculé, mais pas affiché au client à la clôture</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Retrait des fonds <span class="pill missing">Absent</span></span><span class="route">/dashboard/freelancer/paiements — lecture seule</span></div>
+      <div class="flow-arrow">↓</div>
+      <div class="flow-node"><span class="label">Évaluations mutuelles <span class="pill missing">Absent</span></span><span class="route">/dashboard/{client,freelancer}/avis — page statique</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ MATRICE ═══════════════════ -->
+  <section id="matrice">
+    <h2 class="h"><span class="num">03</span>Matrice détaillée par étape</h2>
+    <p class="section-lede">Chaque ligne a été vérifiée dans le code source, pas seulement dans les documents de suivi existants (<code>workflowA.md</code>, <code>workflowB.md</code>).</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Étape</th><th>Statut</th><th>Route / fichier</th><th>Preuve vérifiée</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Publication de mission</td><td><span class="pill ok">Fait</span></td><td class="route">/dashboard/client/missions/creation</td><td class="evidence">prisma/schema.prisma — model Mission</td></tr>
+          <tr><td>Candidature freelance</td><td><span class="pill ok">Fait</span></td><td class="route">/dashboard/freelancer/recherche</td><td class="evidence">model Application</td></tr>
+          <tr><td>Sélection côté client</td><td><span class="pill ok">Fait</span></td><td class="route">/dashboard/client/candidatures</td><td class="evidence">candidatures-table.tsx</td></tr>
+          <tr><td>Messagerie + appels</td><td><span class="pill ok">Fait</span></td><td class="route">messages-view.tsx, floating-chat-bubble.tsx</td><td class="evidence">WebSocket temps réel + WebRTC</td></tr>
+          <tr><td>Offre + négociation (3 tours max)</td><td><span class="pill ok">Fait</span></td><td class="route">/dashboard/{client,freelancer}/offres</td><td class="evidence">offer.service.ts:38,584 — MAX_NEGOTIATION_ROUNDS</td></tr>
+          <tr><td>Génération du contrat (.docx → HTML)</td><td><span class="pill ok">Fait</span></td><td class="route">lib/services/contract-template.service.ts</td><td class="evidence">offer.service.ts:317-334</td></tr>
+          <tr><td>Signature numérique RSA (double signature)</td><td><span class="pill ok">Fait</span></td><td class="route">/api/signature/*</td><td class="evidence">model DigitalCertificate, ContractSignature, ContractAuditEntry (hash chaîné)</td></tr>
+          <tr><td>Financement escrow</td><td><span class="pill ok">Fait</span></td><td class="route">lib/escrow.ts</td><td class="evidence">offer.service.ts:386-404 — escrow.create()</td></tr>
+          <tr><td>Pilotage + boucle jalons</td><td><span class="pill ok">Fait</span></td><td class="route">/dashboard/pilotage/[contractId]</td><td class="evidence">lib/contract-workflow.ts:280-757</td></tr>
+          <tr><td>Litige (purge → prorata → appel → médiation → arbitrage)</td><td><span class="pill ok">Fait</span></td><td class="route">components/contracts/workflow/index.tsx — PhaseDispute</td><td class="evidence">lib/contract-workflow.ts:798-893, non revalidé serveur (voir §04)</td></tr>
+          <tr><td>Clôture normale</td><td><span class="pill ok">Fait</span></td><td class="route">PhaseClosing</td><td class="evidence">workflow/index.tsx:797-886</td></tr>
+          <tr><td>Frais de plateforme (commission 5%)</td><td><span class="pill ok">Corrigé</span></td><td class="route">PhaseClosing</td><td class="evidence">Ventilation brut / commission 5% / net ajoutée à l'écran de clôture</td></tr>
+          <tr><td>Retrait des fonds (freelance)</td><td><span class="pill ok">Corrigé</span></td><td class="route">/api/payouts + WithdrawForm</td><td class="evidence">Modèle Payout, solde revalidé serveur, formulaire IBAN/Payoneer</td></tr>
+          <tr><td>Évaluations mutuelles</td><td><span class="pill ok">Corrigé</span></td><td class="route">/api/reviews + pages avis</td><td class="evidence">Modèle Review, formulaire d'étoiles, pages câblées sur données réelles</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ SÉCURITÉ ═══════════════════ -->
+  <section id="securite">
+    <h2 class="h"><span class="num">04</span>Failles de sécurité — mutation de contrat <span class="pill ok" style="font-size:13px;vertical-align:middle">Toutes corrigées</span></h2>
+    <p class="section-lede">Constat transversal (résolu) : les trois routes de mutation n'authentifiaient pas l'appelant. Elles passent désormais toutes par <code>checkContractAccess</code> (session + appartenance + rôle) et la revalidation métier serveur. Le détail de chaque faille et de son correctif ci-dessous.</p>
+
+    <div class="finding crit">
+      <div class="finding-head"><h3>Aucune authentification sur la route qui pilote l'état du contrat</h3><span class="pill crit">Critique</span><span class="pill ok">Corrigé</span></div>
+      <p><strong>Fichier :</strong> <code>app/api/contracts/[id]/workflow/route.ts</code></p>
+      <p>Le handler <code>POST</code> ne fait aucun appel à <code>getServerSession</code>/<code>getToken</code>, ni aucune vérification que l'appelant est partie au contrat. Il écrit directement en base la phase (<code>NEGOTIATION</code> → … → <code>COMPLETED</code>), les dates de signature client/freelance, le <code>disputeStep</code> et le statut d'un jalon transmis dans le corps JSON, pour n'importe quel <code>contractId</code>.</p>
+      <div class="evidence-block">POST /api/contracts/{id}/workflow
+body: { phase: "COMPLETED", clientSigned: true, freelancerSigned: true,
+        milestoneId: "...", milestoneStatus: "VALIDATED" }
+→ aucune vérification de session, aucun appel à canTransitionContract()
+→ écrit directement dans Contract.status / clientSignedAt / milestone.status</div>
+      <p><strong>Impact :</strong> un appelant qui connaît (ou énumère) un <code>contractId</code> peut faire passer un contrat en <code>COMPLETED</code>, simuler une double signature, ou valider un jalon sans jamais s'authentifier.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> exiger une session (<code>getServerSession</code>), vérifier que <code>session.user.id</code> correspond au client ou au freelance du contrat (comme déjà fait dans <code>app/api/contracts/route.ts</code> ligne 27-37), puis rejouer la transition à travers <code>advanceContractPhase()</code> / <code>advanceMilestone()</code> / <code>advanceDisputeStep()</code> côté serveur au lieu d'écrire l'état brut envoyé par le client.</div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-head"><h3>Libération de paiement sans authentification</h3><span class="pill high">Élevé</span><span class="pill ok">Corrigé</span></div>
+      <p><strong>Fichier :</strong> <code>app/api/contracts/[id]/route.ts</code> (handler <code>PUT</code>)</p>
+      <p>Les actions <code>SUBMIT_MILESTONE</code>, <code>APPROVE_MILESTONE</code>, <code>REJECT_MILESTONE</code> et <code>RELEASE_MILESTONE</code> ne vérifient ni session, ni rôle, ni appartenance au contrat. <code>RELEASE_MILESTONE</code> déclenche un job <code>PAYMENT_RELEASE</code> (mouvement de fonds) sur la seule base d'un <code>milestoneId</code> transmis dans le corps de la requête.</p>
+      <div class="evidence-block">PUT /api/contracts/{id}  { action: "RELEASE_MILESTONE", milestoneId }
+→ prisma.milestone.update({ status: "RELEASED" })
+→ enqueueJob("PAYMENT_RELEASE", { amount, contractId, milestoneId })
+(aucune vérification que l'appelant est le client de ce contrat)</div>
+      <div class="fix-block"><b>✓ Appliqué :</b> restreindre <code>APPROVE_MILESTONE</code>/<code>REJECT_MILESTONE</code>/<code>RELEASE_MILESTONE</code> au client du contrat et <code>SUBMIT_MILESTONE</code> au freelance, via une vérification de session + appartenance avant tout <code>prisma.milestone.update</code>.</div>
+    </div>
+
+    <div class="finding high">
+      <div class="finding-head"><h3>Gate d'autorisation du framework présent mais non activé</h3><span class="pill high">Élevé</span><span class="pill ok">Corrigé</span></div>
+      <p><strong>Fichier :</strong> <code>app/api/contracts/[id]/milestones/route.ts</code></p>
+      <p>Les handlers <code>GET</code>/<code>POST</code>/<code>PUT</code> passent bien par <code>createApiHandler()</code>, mais sans <code>requireRole</code> — l'option existe (<code>lib/api-gateway.ts:19</code>, utilisée par d'autres routes du projet) mais n'est simplement pas renseignée ici. Le <code>PUT</code> accepte un <code>status: "APPROVED"</code> et déclenche <code>PAYMENT_RELEASE</code> sans identifier l'appelant.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> ajouter <code>requireRole: "CLIENT"</code> sur le <code>PUT</code> (validation/rejet de jalon) et <code>requireRole: "FREELANCER"</code> sur le <code>POST</code> (soumission), en cohérence avec le pattern déjà en place sur <code>/api/offers</code>.</div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-head"><h3>Les garde-fous métier ne sont appliqués que côté client</h3><span class="pill medium">Architectural</span><span class="pill ok">Corrigé</span></div>
+      <p><strong>Fichiers :</strong> <code>lib/contract-workflow.ts</code> ↔ <code>components/contracts/workflow/index.tsx:936</code></p>
+      <p><code>canActivateContract()</code> (double signature obligatoire), <code>allMilestonesValidated()</code> (100% requis avant clôture), <code>isArbitrationEligible()</code> (seuil d'enjeu) et <code>isAppealReceivable()</code> (preuve obligatoire) sont des fonctions pures bien conçues — mais elles ne sont invoquées que dans le composant React, juste avant l'appel <code>fetch(".../workflow")</code>. La route serveur qui persiste l'état ne les rappelle jamais. C'est la cause racine qui rend les deux constats précédents exploitables au-delà d'un simple accès en lecture : sans revalidation serveur, un appel direct à l'API peut clôturer un contrat non entièrement signé, déclarer un arbitrage sous le seuil, ou valider un appel sans preuve.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> déplacer l'appel à <code>advanceContractPhase</code>/<code>advanceDisputeStep</code> dans la route API elle-même (à partir de l'état lu en base), et ne laisser au client que l'affichage du résultat renvoyé par le serveur.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ LACUNES FONCTIONNELLES ═══════════════════ -->
+  <section id="lacunes">
+    <h2 class="h"><span class="num">05</span>Lacunes fonctionnelles</h2>
+    <p class="section-lede">Trois écarts entre le parcours documenté et l'implémentation réelle, sans risque de sécurité mais bloquants pour un lancement.</p>
+
+    <div class="finding medium">
+      <div class="finding-head"><h3>Retrait des fonds — flux absent</h3><span class="pill medium">Fonctionnel</span><span class="pill ok">Corrigé</span></div>
+      <p><code>/dashboard/freelancer/paiements</code> n'affichait que l'historique en lecture seule. Aucun bouton de retrait, aucune route <code>/api/payouts</code>, aucun formulaire.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> modèle <code>Payout</code> + <code>PayoutStatus</code>, helper de solde disponible (<code>lib/payouts.ts</code>), route <code>GET/POST /api/payouts</code> avec revalidation du solde côté serveur, formulaire IBAN/Payoneer et liste des demandes sur la page paiements.</div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-head"><h3>Évaluations mutuelles — non implémentées</h3><span class="pill medium">Fonctionnel</span><span class="pill ok">Corrigé</span></div>
+      <p>Aucun modèle <code>Review</code>, pages avis à valeurs codées en dur, pas de déclenchement à la clôture.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> modèle <code>Review</code> (note globale + sous-notes, un avis par auteur/contrat), route <code>GET/POST /api/reviews</code> (auteur = partie au contrat, contrat terminé), formulaire d'étoiles, pages avis client/freelance câblées sur données réelles, CTA « Laisser un avis » depuis <code>PhaseClosing</code>.</div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-head"><h3>Récapitulatif des frais de plateforme absent à la clôture</h3><span class="pill medium">Fonctionnel</span><span class="pill ok">Corrigé</span></div>
+      <p>Le calcul existait mais <code>PhaseClosing</code> n'affichait que le montant brut, sans ventilation.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> bloc dédié dans <code>PhaseClosing</code> montrant montant brut → commission (5 %) → net versé au prestataire, avec le net repris dans l'écran de contrat terminé.</div>
+    </div>
+
+    <div class="finding medium">
+      <div class="finding-head"><h3>Fenêtre d'appel de 48h sans minuteur automatique</h3><span class="pill medium">Fonctionnel</span><span class="pill ok">Corrigé</span></div>
+      <p>Aucun job ne faisait progresser un contrat resté en <code>APPEAL_WINDOW</code> : blocage possible indéfini.</p>
+      <div class="fix-block"><b>✓ Appliqué :</b> horodatage <code>appealOpenedAt</code> persisté, service <code>resolveExpiredAppeals()</code> qui clôt les fenêtres dépassant 48h vers <code>DISPUTE_RESOLVED</code>, branché sur un balayage périodique (15 min) dans le process worker.</div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ TESTS ═══════════════════ -->
+  <section id="tests">
+    <h2 class="h"><span class="num">06</span>Couverture de tests</h2>
+    <p class="section-lede">Le workflow contrat/jalons est le mieux testé du projet en volume — mais aucun de ces tests ne couvre l'authentification, contrairement aux tests sur les offres.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Fichier</th><th>Lignes</th><th>Couvre</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">tests/full-contract-workflow.test.ts</td><td class="tabular">931</td><td>Transitions de phase de bout en bout (négociation → clôture)</td></tr>
+          <tr><td class="mono">tests/pilotage-milestone-sync.test.ts</td><td class="tabular">985</td><td>Synchronisation temps réel des jalons entre client et freelance</td></tr>
+          <tr><td class="mono">tests/milestone-api-reject.test.ts</td><td class="tabular">246</td><td>Rejet de jalon, motif obligatoire, compteur de révisions</td></tr>
+          <tr><td class="mono">tests/milestone-workflow-persistence.test.ts</td><td class="tabular">158</td><td>Persistance en base des transitions de jalon</td></tr>
+          <tr><td class="mono">tests/offer-api.test.ts, offer-workflow-integration.test.ts</td><td class="tabular">—</td><td>Seuls fichiers du projet à tester des réponses <code>401</code> / <code>getServerSession</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="banner" style="margin-top:20px;">
+      <h3 style="padding-left:8px">✅ Angle mort des tests — comblé</h3>
+      <p>Un nouveau fichier <code>tests/contract-authorization.test.ts</code> couvre 9 cas : appel sans session, tiers non partie au contrat, mauvais rôle (freelance qui valide, client qui soumet), rejet sans motif, plus le chemin nominal et la lecture du contexte. Les 2 tests qui encodaient l'ancien comportement d'état brut ont été réécrits pour le modèle intent-based authentifié. <strong>Total : 354 tests au vert (22 fichiers).</strong></p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ PLAN D'ACTION ═══════════════════ -->
+  <section id="plan">
+    <h2 class="h"><span class="num">07</span>Plan d'action — réalisé</h2>
+    <div class="roadmap">
+      <div class="rcol">
+        <h4>✅ Bloquant avant production — fait</h4>
+        <div class="hint">Ne peut plus exposer de fonds sans autorisation</div>
+        <ol>
+          <li><strong>Authentification + appartenance</strong> sur les 3 routes, via <code>lib/contract-access.ts</code> (<code>checkContractAccess</code>).</li>
+          <li><strong>Revalidation serveur</strong> des transitions via un service autoritaire (<code>advanceContractPhase</code>/<code>advanceMilestone</code>/<code>advanceDisputeStep</code>) ; le front n'envoie que des intentions.</li>
+          <li>9 tests d'accès non autorisé ajoutés + 2 tests obsolètes réécrits.</li>
+        </ol>
+      </div>
+      <div class="rcol">
+        <h4>✅ Avant lancement commercial — fait</h4>
+        <div class="hint">Fonctionnalités désormais opérationnelles</div>
+        <ol>
+          <li>Flux de retrait : <code>POST /api/payouts</code> + formulaire IBAN/Payoneer + solde revalidé.</li>
+          <li>Modèle <code>Review</code> + <code>/api/reviews</code> + pages avis réelles + CTA à la clôture.</li>
+          <li>Ventilation frais (brut / 5 % / net) dans <code>PhaseClosing</code>.</li>
+          <li>Résolution auto de la fenêtre d'appel à 48h (worker périodique).</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="banner" style="margin-top:22px;">
+      <h3 style="padding-left:8px">🔁 Étape restante côté exploitation</h3>
+      <p>Le client Prisma a été régénéré et le schéma appliqué (<code>db push</code>) : colonnes <code>workflowPhase</code>/<code>appealOpenedAt</code>, tables <code>reviews</code>/<code>payouts</code>. Il reste à <strong>redémarrer la stack de dev</strong> (<code>npm run dev:all</code>, workers inclus pour le balayage des appels). Le traitement bancaire réel des payouts reste hors périmètre applicatif (demandes enregistrées en statut <code>PENDING</code>).</p>
+    </div>
+  </section>
+
+  <footer>Audit + correctifs — 16 juillet 2026. Tous les points identifiés sont corrigés ; 354 tests au vert, typecheck propre, schéma Prisma appliqué.</footer>
+</div>

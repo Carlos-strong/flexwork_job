@@ -12,6 +12,8 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  // Pas d'URL fixe : NextAuth auto-détecte depuis le Host header, ce qui permet
+  // l'accès depuis d'autres appareils du réseau local (ex: 192.168.1.84:3000)
   pages: {
     signIn: "/connexion",
     newUser: "/inscription",
@@ -66,6 +68,24 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // URLs relatives : renvoyées telles quelles → le navigateur les résout
+      // par rapport à l'origine courante (localhost ou 192.168.x.x)
+      if (url.startsWith("/")) return url;
+      // URLs absolues : autoriser si c'est le même site (localhost ou IP locale)
+      try {
+        const urlObj = new URL(url);
+        if (
+          urlObj.hostname === "localhost" ||
+          /^192\.168\.\d+\.\d+$/.test(urlObj.hostname) ||
+          /^10\.\d+\.\d+\.\d+$/.test(urlObj.hostname) ||
+          /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(urlObj.hostname)
+        ) {
+          return url;
+        }
+      } catch { /* URL invalide, on laisse passer */ }
+      return baseUrl;
+    },
     async jwt({ token, user, account }) {
       if (user) {
         return {
@@ -77,6 +97,21 @@ export const authOptions: NextAuthOptions = {
       }
       if (account && !token.activeProfile) {
         token.activeProfile = "FREELANCER";
+      }
+      // Rafraîchir emailVerified depuis la BDD si le token ne l'a pas encore
+      // (cas où l'utilisateur vérifie son email après s'être connecté)
+      if (!token.emailVerified && token.email) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email as string },
+            select: { emailVerified: true },
+          });
+          if (dbUser?.emailVerified) {
+            token.emailVerified = dbUser.emailVerified.toISOString();
+          }
+        } catch {
+          // Silencieux — on réessaiera au prochain rafraîchissement
+        }
       }
       return token;
     },

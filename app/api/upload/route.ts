@@ -13,6 +13,11 @@ const ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/zip",
   "text/plain",
+  // Vidéos
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-msvideo",
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -27,12 +32,17 @@ const MIME_EXTENSIONS: Record<string, string> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "application/zip": "zip",
   "text/plain": "txt",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+  "video/x-msvideo": "avi",
 };
 
 const CATEGORY_ALLOWED = [
   "avatar", "photo_recto", "photo_verso", "selfie",
   "cahier_des_charges", "certificat", "portfolio",
   "photo_demande", "piece_jointe", "general",
+  "evidence", // Preuves de jalons (pilotage)
 ];
 
 export async function POST(req: Request) {

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { paysList, getCurrencyForCountry } from "@/lib/data/countries";
+import { useAutoSave } from "@/hooks/use-auto-save";
 
 // ── Types ──
 type WorkMode = "REMOTE" | "ON_SITE" | "HYBRID";
@@ -59,6 +60,22 @@ export function MissionFormWizard({ missionId }: { missionId?: string }) {
 
   // Marquer comme modifié dès qu'un champ change
   const markDirty = () => { if (isEditing) setDirty(true); };
+
+  // Auto-save du brouillon toutes les 5s (plan5.md §4)
+  const { restored, clearDraft, hasSavedDraft } = useAutoSave(
+    "mission-create",
+    form as unknown as Record<string, unknown>,
+    missionId
+  );
+
+  // Restaurer le brouillon au montage (mode création uniquement)
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (restored && !isEditing && !draftRestoredRef.current) {
+      draftRestoredRef.current = true;
+      setForm((prev) => ({ ...prev, ...restored }));
+    }
+  }, [restored, isEditing, restored?.title]);
 
   // Helper pour le bouton d'enregistrement avec état visuel
   const renderSaveBtn = () => {
@@ -202,6 +219,9 @@ export function MissionFormWizard({ missionId }: { missionId?: string }) {
 
     setError("");
 
+    // Nettoyer le brouillon après soumission réussie
+    clearDraft();
+
     if (isEditing) {
       router.refresh();
       router.push(`/dashboard/client/missions/${missionId}`);
@@ -229,6 +249,13 @@ export function MissionFormWizard({ missionId }: { missionId?: string }) {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Bannière de brouillon restauré (plan5.md §4) */}
+          {hasSavedDraft && !isEditing && (
+            <div className="rounded-[10px] border border-[#FCD89A] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E] flex items-center gap-2">
+              <span>📝</span>
+              <span><strong>Brouillon restauré</strong> — vos modifications non sauvegardées ont été récupérées. Vous pouvez continuer où vous vous êtes arrêté.</span>
+            </div>
+          )}
           {/* Barre de progression */}
           <div className="flex items-center gap-2 mb-8 bg-white p-4 rounded-[12px] border border-[#E2E0D9] shadow-sm">
         {steps.map((s, i) => (

@@ -20,8 +20,8 @@
 
 | Page | Rôle | Description |
 |------|------|-------------|
-| `/dashboard/client/contrats/offres` | Client | Liste + détail des offres envoyées, retrait possible |
-| `/dashboard/freelancer/contrats/offres` | Freelance | Liste + détail des offres reçues, accepter/refuser |
+| `/dashboard/client/offres` | Client | Liste + détail des offres envoyées, retrait possible |
+| `/dashboard/freelancer/offres` | Freelance | Liste + détail des offres reçues, accepter/refuser |
 | `/dashboard/client/candidatures` | Client | Pipeline de recrutement avec envoi d'offre intégré |
 
 ## Workflow

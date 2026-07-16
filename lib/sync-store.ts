@@ -4,7 +4,7 @@
  * Survit au hot-reload Next.js en dev grâce au singleton globalThis.
  */
 
-export type SyncEventType = "message" | "contract_update" | "milestone_update";
+export type SyncEventType = "message" | "contract_update" | "milestone_update" | "workflow_update";
 
 export interface SyncEvent {
   type: SyncEventType;

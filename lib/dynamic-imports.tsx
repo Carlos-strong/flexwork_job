@@ -40,6 +40,12 @@ export const FreelancerSearch = dynamic(
   }
 );
 
+/** Bulle de chat flottante (WebSocket, hors écran serveur) */
+export const FloatingChatBubble = dynamic(
+  () => import("@/components/chat/floating-chat-bubble").then((m) => ({ default: m.FloatingChatBubble })),
+  { ssr: false }
+);
+
 /** FAQ Accordion — chargé seulement sur la page FAQ */
 export const FaqAccordion = dynamic(
   () => import("@/components/elements/faq-accordion").then((m) => ({ default: m.FaqAccordion })),

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { AutoRefresh } from "@/components/elements/auto-refresh";
+import { PageHeader } from "@/components/dashboard/ui";
 
 export const revalidate = 0;
 
@@ -207,32 +209,20 @@ export default async function CandidaturesPage() {
       style={{ fontFamily: "var(--font-space-grotesk, Inter, sans-serif)" }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p
-            className="text-[11px] uppercase tracking-[0.08em] font-medium mb-1"
-            style={{ fontFamily: "var(--font-ibm-plex-mono, monospace)", color: "#1F7A5C" }}
+      <PageHeader
+        eyebrow={<span className="uppercase tracking-[0.08em] text-[#1F7A5C]">Pipeline de candidatures</span>}
+        title="Mes candidatures"
+        subtitle="Suivez votre progression dans chaque processus de recrutement."
+        actions={
+          <Link
+            href="/dashboard/freelancer/recherche"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-colors"
+            style={{ background: "#1F7A5C" }}
           >
-            Pipeline de candidatures
-          </p>
-          <h1
-            className="text-[24px] font-medium tracking-[-0.01em]"
-            style={{ fontFamily: "var(--font-fraunces, serif)", color: "#14213D" }}
-          >
-            Mes candidatures
-          </h1>
-          <p className="text-[13.5px] text-[#6B7280] mt-1">
-            Suivez votre progression dans chaque processus de recrutement
-          </p>
-        </div>
-        <Link
-          href="/dashboard/freelancer/recherche"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold text-white transition-colors"
-          style={{ background: "#1F7A5C" }}
-        >
-          🔍 Trouver des missions
-        </Link>
-      </div>
+            🔍 Trouver des missions
+          </Link>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

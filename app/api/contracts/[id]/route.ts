@@ -1,15 +1,37 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { contracts, applications, persistMockStore } from "@/lib/mock-data";
 import { conversations, addSystemMessage } from "@/lib/collaboration";
 import { enqueueJob } from "@/lib/queue";
 import { syncStore } from "@/lib/sync-store";
+import { checkContractAccess, type ContractRole } from "@/lib/contract-access";
+
+/** Rôle autorisé par action de mutation de contrat. */
+const ACTION_REQUIRED_ROLE: Record<string, ContractRole | undefined> = {
+  SUBMIT_MILESTONE: "freelancer",
+  APPROVE_MILESTONE: "client",
+  REJECT_MILESTONE: "client",
+  RELEASE_MILESTONE: "client",
+  // DECLINED : les deux parties peuvent refuser → pas de rôle requis (partie au contrat suffit)
+};
 
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    // ── Authentification + appartenance au contrat ──────
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    const preview = await req.clone().json().catch(() => ({} as Record<string, unknown>));
+    const requiredRole = ACTION_REQUIRED_ROLE[(preview as { action?: string }).action ?? ""];
+    const access = await checkContractAccess(params.id, userId, requiredRole);
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+
     // Chercher le contrat en Prisma (fallback mock si indisponible)
     let missionTitle = "Mission";
     let contractExists = false;
@@ -69,7 +91,11 @@ export async function PUT(
       try {
         milestone = await prisma.milestone.update({
           where: { id: milestoneId },
-          data: { status: "IN_REVIEW" },
+          data: {
+            status: "IN_REVIEW",
+            rejectionReason: null,  // ← nettoyage après resoumission
+            rejectedAt: null as any,        // ← nettoyage du rejet précédent
+          },
           select: { id: true, title: true, amount: true },
         });
       } catch {
@@ -132,6 +158,55 @@ export async function PUT(
       return NextResponse.json({ message: "Milestone approuvé", milestoneId: milestone.id, status: "APPROVED" });
     }
 
+    // ── Action : rejet d'un milestone (CLIENT) ──────────
+    if (action === "REJECT_MILESTONE") {
+      if (!milestoneId) return NextResponse.json({ error: "milestoneId requis" }, { status: 400 });
+      const { rejectionReason } = body;
+      if (!rejectionReason) return NextResponse.json({ error: "Motif de rejet obligatoire" }, { status: 400 });
+
+      let milestone: { id: string; title: string; amount: number } | null = null;
+      try {
+        const updated = await prisma.milestone.update({
+          where: { id: milestoneId },
+          data: {
+            status: "IN_REVIEW",
+            revisionCount: { increment: 1 },
+            rejectionReason,
+            rejectedAt: new Date() as any,
+          },
+          select: { id: true, title: true, amount: true },
+        });
+        milestone = updated;
+      } catch {
+        const mock = mockContract?.milestones?.find((m: { id: string }) => m.id === milestoneId);
+        if (mock) {
+          (mock as Record<string, unknown>).status = "IN_REVIEW";
+          (mock as Record<string, unknown>).revisionCount = ((mock as Record<string, unknown>).revisionCount as number || 0) + 1;
+          (mock as Record<string, unknown>).rejectionReason = rejectionReason;
+          milestone = mock as { id: string; title: string; amount: number };
+        }
+      }
+      if (!milestone) return NextResponse.json({ error: "Milestone introuvable" }, { status: 404 });
+
+      const conv = conversations.find((c) => c.contractId === params.id);
+      if (conv) addSystemMessage(conv.id, `❌ Milestone rejeté : "${milestone.title}" — ${rejectionReason}`);
+
+      await enqueueJob("MILESTONE_REJECTED", {
+        milestoneId: milestone.id,
+        contractId: params.id,
+        title: milestone.title,
+        amount: milestone.amount,
+        reason: rejectionReason,
+      }).catch(() => {});
+
+      syncStore.emit(params.id, {
+        type: "milestone_update",
+        data: { milestoneId: milestone.id, status: "IN_REVIEW", title: milestone.title, rejectionReason },
+      });
+
+      return NextResponse.json({ message: "Milestone rejeté", milestoneId: milestone.id, status: "IN_REVIEW", revisionCount: body.revisionCount });
+    }
+
     // ── Action : libération paiement milestone ──────────
     if (action === "RELEASE_MILESTONE") {
       if (!milestoneId) return NextResponse.json({ error: "milestoneId requis" }, { status: 400 });
@@ -175,7 +250,7 @@ export async function PUT(
       return NextResponse.json({ message: "Paiement libéré", milestoneId: milestone.id, status: "RELEASED" });
     }
 
-    return NextResponse.json({ error: "Action non supportée. Actions: DECLINED, SUBMIT_MILESTONE, APPROVE_MILESTONE, RELEASE_MILESTONE" }, { status: 400 });
+    return NextResponse.json({ error: "Action non supportée. Actions: DECLINED, SUBMIT_MILESTONE, APPROVE_MILESTONE, REJECT_MILESTONE, RELEASE_MILESTONE" }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Erreur lors de la mise à jour" }, { status: 500 });
   }

@@ -7,6 +7,7 @@ const adminNav = [
   { href: "/admin/kyc", label: "KYC et Vérifications", icon: "🪪" },
   { href: "/admin/missions", label: "Missions", icon: "📋" },
   { href: "/admin/disputes", label: "Litiges", icon: "⚖️" },
+  { href: "/admin/contrats", label: "Contrats", icon: "🔄" },
   { href: "/admin/paiements", label: "Paiements", icon: "💳" },
   { href: "/admin/reports", label: "Signalements", icon: "🚩" },
   { href: "/admin/uma-recruiter", label: "IA Uma", icon: "🤖" },

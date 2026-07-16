@@ -37,7 +37,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
 
     // Le lien par défaut pointe vers la page appropriée selon le type
     const dashboardLink = (() => {
-      if (type.startsWith("OFFER")) return "/dashboard/freelancer/contrats/offres";
+      if (type.startsWith("OFFER")) return "/dashboard/freelancer/offres";
       if (type.startsWith("CONTRACT") || type.startsWith("MILESTONE")) return "/dashboard/freelancer/contrats";
       return undefined;
     })();
@@ -74,7 +74,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
             "offer",
             title ?? "Nouvelle offre reçue",
             message ?? `${clientName} vous a envoyé une offre pour "${app.mission.title}"`,
-            "/dashboard/freelancer/contrats/offres"
+            "/dashboard/freelancer/offres"
           );
           // Dashboard push au client (confirmation d'envoi)
           if (app.mission.client?.user?.id) {
@@ -83,7 +83,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
               "offer",
               "Offre envoyée",
               `Votre offre "${title}" a été envoyée à ${freelanceName}`,
-              "/dashboard/client/contrats/offres"
+              "/dashboard/client/offres"
             );
           }
         }
@@ -124,7 +124,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
               "offer",
               "Offre acceptée",
               `${freelanceName} a accepté votre offre pour "${missionTitle}" — contrat créé`,
-              "/dashboard/client/contrats/offres"
+              "/dashboard/client/offres"
             );
           }
         }
@@ -160,7 +160,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
               "offer",
               "Offre refusée",
               `${freelanceName} a refusé votre offre pour "${offer.application.mission.title}"`,
-              "/dashboard/client/contrats/offres"
+              "/dashboard/client/offres"
             );
           }
         }
@@ -204,7 +204,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
               "offer",
               "Contre-proposition reçue",
               `${actorLabel} a proposé des modifications à l'offre "${offer.title}"`,
-              "/dashboard/client/contrats/offres"
+              "/dashboard/client/offres"
             );
           }
         }
@@ -231,7 +231,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
             "offer",
             isLast ? "⚠️ Dernière tentative de négociation" : "Négociation en cours",
             message ?? `Il reste ${data?.remainingRounds ?? 0} tentative(s) avant refus automatique`,
-            "/dashboard/freelancer/contrats/offres"
+            "/dashboard/freelancer/offres"
           );
         }
         break;
@@ -257,7 +257,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
             "offer",
             "⏰ Offre refusée automatiquement",
             message ?? "La limite de négociation a été atteinte — l'offre a été automatiquement refusée.",
-            "/dashboard/freelancer/contrats/offres"
+            "/dashboard/freelancer/offres"
           );
         }
         break;
@@ -292,7 +292,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
               "offer",
               "↩️ Offre retirée",
               `L'offre pour "${offer.application.mission.title}" a été retirée par le client`,
-              "/dashboard/freelancer/contrats/offres"
+              "/dashboard/freelancer/offres"
             );
           }
         }
@@ -312,7 +312,7 @@ export async function sendNotification(input: NotificationInput): Promise<void> 
             "offer",
             "⏰ Offre expirée",
             message ?? "Une offre a expiré — aucun réponse dans le délai imparti.",
-            "/dashboard/freelancer/contrats/offres"
+            "/dashboard/freelancer/offres"
           );
         }
         break;
